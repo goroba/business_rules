@@ -46,7 +46,9 @@ business-rules/
 ├── src/
 │   └── business_rules/
 │       ├── __init__.py
-│       ├── example.py
+│       ├── condition.py
+│       ├── operand.py
+│       ├── operator.py
 │       ├── py.typed
 │       └── bridges/
 │           ├── __init__.py
@@ -54,7 +56,9 @@ business-rules/
 │               ├── __init__.py
 │               └── py.typed
 └── tests/
-    ├── test_example.py
+    ├── test_condition.py
+    ├── test_operand.py
+    ├── test_operator.py
     └── sqlalchemy2/
         ├── test_import.py
         └── test_import_without_dependency.py

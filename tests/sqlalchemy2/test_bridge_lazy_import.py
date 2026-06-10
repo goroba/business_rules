@@ -11,6 +11,13 @@ def test_lazy_import_returns_bridge_class() -> None:
     assert SQLAlchemyRuleBridge.__name__ == "SQLAlchemyRuleBridge"
 
 
+def test_getattr_raises_for_unknown_attribute() -> None:
+    import business_rules.bridges as bridges
+
+    with pytest.raises(AttributeError, match="has no attribute 'unknown'"):
+        _ = bridges.unknown
+
+
 def test_lazy_import_raises_helpful_error_when_sqlalchemy_missing() -> None:
     for module_name in (
         "business_rules.bridges",
