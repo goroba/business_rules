@@ -6,7 +6,7 @@ import pytest
 
 
 def test_import_raises_helpful_error_when_sqlalchemy_missing() -> None:
-    module_name = "business_rules.bridges.sqlalchemy2"
+    module_name = "bridges.sqlalchemy2"
     sys.modules.pop(module_name, None)
 
     with (

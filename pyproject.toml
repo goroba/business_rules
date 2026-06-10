@@ -35,7 +35,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/business_rules"]
+packages = ["src/business_rules", "src/bridges"]
 
 [tool.hatch.build]
 include = [
@@ -63,7 +63,7 @@ select = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["business_rules"]
+known-first-party = ["bridges", "business_rules"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -71,10 +71,10 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 mypy_path = "src"
-packages = ["business_rules"]
+packages = ["bridges", "business_rules"]
 
 [tool.coverage.run]
-source = ["business_rules"]
+source = ["bridges", "business_rules"]
 branch = true
 
 [tool.coverage.report]
