@@ -1,65 +1,7 @@
-# business-rules
+# goroba/business-rules
 
-A Python library template with `src/` layout, pytest, ruff, and mypy.
+## Documentation
 
-## Setup
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-```
-
-### SQLAlchemy 2.x bridge
-
-```bash
-pip install "business-rules[sqlalchemy2]"
-```
-
-```python
-import business_rules.bridges.sqlalchemy2  # requires the extra
-```
-
-## Development
-
-```bash
-# Run tests
-pytest
-
-# Run tests with coverage
-pytest --cov=business_rules --cov-report=term-missing
-
-# Lint
-ruff check src tests
-ruff format --check src tests
-
-# Type check
-mypy src tests
-```
-
-## Project structure
-
-```
-business-rules/
-├── pyproject.toml
-├── README.md
-├── src/
-│   └── business_rules/
-│       ├── __init__.py
-│       ├── condition.py
-│       ├── operand.py
-│       ├── operator.py
-│       ├── py.typed
-│       └── bridges/
-│           ├── __init__.py
-│           └── sqlalchemy2/
-│               ├── __init__.py
-│               └── py.typed
-└── tests/
-    ├── test_condition.py
-    ├── test_operand.py
-    ├── test_operator.py
-    └── sqlalchemy2/
-        ├── test_import.py
-        └── test_import_without_dependency.py
-```
+- [Setup](docs/setup.md)
+- [Development](docs/development.md)
+- [Creating a custom data type (Money example)](docs/creating-a-data-type.md)
