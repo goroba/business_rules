@@ -9,6 +9,7 @@ from types import MappingProxyType
 from typing import Any, TypeVar
 
 from business_rules.data_types.pool import DataTypesPool
+from business_rules.name_normalizers import NameNormalizer, SnakeCaseNameNormalizer
 
 __all__ = [
     "Context",
@@ -45,10 +46,14 @@ def _resolve_name(name: str | None, obj: Callable[..., Any]) -> str:
 
 
 class Context:
-    def __init__(self) -> None:
+    def __init__(self, name_normalizer: NameNormalizer | None = None) -> None:
+        self._name_normalizer = name_normalizer or SnakeCaseNameNormalizer()
         self._variables: dict[str, RegisteredEntry] = {}
         self._actions: dict[str, RegisteredEntry] = {}
         self._functions: dict[str, RegisteredEntry] = {}
+
+    def _normalize_entry_name(self, name: str) -> str:
+        return self._name_normalizer.normalize(name)
 
     @property
     def variables(self) -> Mapping[str, RegisteredEntry]:
@@ -70,12 +75,13 @@ class Context:
         func: Callable[..., Any],
         data_type: str,
     ) -> None:
-        if not name:
-            raise ValueError("Name must not be empty")
+        normalized_name = self._normalize_entry_name(name)
         DataTypesPool.get(data_type)
-        if name in registry:
-            raise ValueError(f"{kind} {name!r} is already registered")
-        registry[name] = RegisteredEntry(name=name, data_type=data_type, func=func)
+        if normalized_name in registry:
+            raise ValueError(f"{kind} {normalized_name!r} is already registered")
+        registry[normalized_name] = RegisteredEntry(
+            name=normalized_name, data_type=data_type, func=func
+        )
 
     def register_variable(
         self,
@@ -110,31 +116,47 @@ class Context:
         global_registry: dict[str, RegisteredEntry],
         kind: str,
         name: str,
+        normalized_name: str,
     ) -> RegisteredEntry:
         try:
-            return registry[name]
+            return registry[normalized_name]
         except KeyError as exc:
             try:
-                return global_registry[name]
+                return global_registry[normalized_name]
             except KeyError:
                 raise KeyError(f"{kind} {name!r} is not registered") from exc
 
     def get_variable(self, name: str) -> RegisteredEntry:
         global_ctx = get_global_context()
+        normalized_name = self._normalize_entry_name(name)
         return self._get_with_fallback(
-            self._variables, global_ctx._variables, "Variable", name
+            self._variables,
+            global_ctx._variables,
+            "Variable",
+            name,
+            normalized_name,
         )
 
     def get_action(self, name: str) -> RegisteredEntry:
         global_ctx = get_global_context()
+        normalized_name = self._normalize_entry_name(name)
         return self._get_with_fallback(
-            self._actions, global_ctx._actions, "Action", name
+            self._actions,
+            global_ctx._actions,
+            "Action",
+            name,
+            normalized_name,
         )
 
     def get_function(self, name: str) -> RegisteredEntry:
         global_ctx = get_global_context()
+        normalized_name = self._normalize_entry_name(name)
         return self._get_with_fallback(
-            self._functions, global_ctx._functions, "Function", name
+            self._functions,
+            global_ctx._functions,
+            "Function",
+            name,
+            normalized_name,
         )
 
 
@@ -153,20 +175,23 @@ class GlobalContext(Context):
         self._initialized = True
 
     def get_variable(self, name: str) -> RegisteredEntry:
+        normalized_name = self._normalize_entry_name(name)
         try:
-            return self._variables[name]
+            return self._variables[normalized_name]
         except KeyError as exc:
             raise KeyError(f"Variable {name!r} is not registered") from exc
 
     def get_action(self, name: str) -> RegisteredEntry:
+        normalized_name = self._normalize_entry_name(name)
         try:
-            return self._actions[name]
+            return self._actions[normalized_name]
         except KeyError as exc:
             raise KeyError(f"Action {name!r} is not registered") from exc
 
     def get_function(self, name: str) -> RegisteredEntry:
+        normalized_name = self._normalize_entry_name(name)
         try:
-            return self._functions[name]
+            return self._functions[normalized_name]
         except KeyError as exc:
             raise KeyError(f"Function {name!r} is not registered") from exc
 

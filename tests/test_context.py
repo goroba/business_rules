@@ -8,6 +8,10 @@ from business_rules.context import (
     get_global_context,
     variable,
 )
+from business_rules.name_normalizers import (
+    CamelCaseNameNormalizer,
+    SnakeCaseNameNormalizer,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -56,7 +60,7 @@ def test_register_callable_class() -> None:
             return "alice"
 
     entry = get_global_context().get_variable("CurrentUser")
-    assert entry.name == "CurrentUser"
+    assert entry.name == "current_user"
     assert entry.func is CurrentUser
 
 
@@ -254,3 +258,78 @@ def test_lookup_action_and_function_fall_back_to_global() -> None:
     local_ctx = Context()
     assert local_ctx.get_action("global_action").func is global_action
     assert local_ctx.get_function("global_function").func is global_function
+
+
+def test_get_variable_with_alternate_casing() -> None:
+    @variable("user_age", data_type="integer")
+    def user_age() -> int:
+        return 42
+
+    assert get_global_context().get_variable("userAge").func is user_age
+    assert get_global_context().get_variable("User-Age").func is user_age
+
+
+def test_get_action_with_alternate_casing() -> None:
+    @action("notify_user", data_type="boolean")
+    def notify_user() -> bool:
+        return True
+
+    assert get_global_context().get_action("notifyUser").func is notify_user
+
+
+def test_get_function_with_alternate_casing() -> None:
+    @function("sum_values", data_type="integer")
+    def sum_values(a: int, b: int) -> int:
+        return a + b
+
+    assert get_global_context().get_function("sumValues").func is sum_values
+
+
+def test_register_rejects_equivalent_casing_as_duplicate() -> None:
+    ctx = Context()
+
+    @variable("user_age", context=ctx, data_type="string")
+    def first() -> str:
+        return "first"
+
+    with pytest.raises(ValueError, match="already registered"):
+
+        @variable("userAge", context=ctx, data_type="string")
+        def second() -> str:
+            return "second"
+
+
+def test_context_with_camel_case_normalizer() -> None:
+    ctx = Context(name_normalizer=CamelCaseNameNormalizer())
+
+    @variable("user_age", context=ctx, data_type="string")
+    def user_age() -> str:
+        return "ok"
+
+    assert "userAge" in ctx.variables
+    assert ctx.get_variable("user_age").func is user_age
+    assert ctx.get_variable("UserAge").func is user_age
+
+
+def test_global_context_defaults_to_snake_case_normalizer() -> None:
+    global_ctx = get_global_context()
+    assert isinstance(global_ctx._name_normalizer, SnakeCaseNameNormalizer)
+
+
+def test_global_context_get_methods_normalize_search_names() -> None:
+    @variable("user_age", data_type="integer")
+    def user_age() -> int:
+        return 1
+
+    @action("notify_user", data_type="boolean")
+    def notify_user() -> bool:
+        return True
+
+    @function("sum_values", data_type="integer")
+    def sum_values() -> int:
+        return 2
+
+    global_ctx = get_global_context()
+    assert global_ctx.get_variable("userAge").func is user_age
+    assert global_ctx.get_action("notifyUser").func is notify_user
+    assert global_ctx.get_function("sumValues").func is sum_values
