@@ -4,24 +4,22 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
+from typing import Any
 
-from business_rules.operand import Operand
+from business_rules.evaluation import EvaluationContext
 
-__all__ = ["Executable", "Action", "Function"]
+__all__ = ["Executable", "Action"]
 
 
 @dataclass
 class Executable(ABC):
     name: str
-    args: tuple[Operand, ...] = ()
-    kwargs: dict[str, Operand] = field(default_factory=dict)
+    args: tuple[Any, ...] = ()
+    kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class Action(Executable):
-    pass
-
-
-@dataclass
-class Function(Executable):
-    pass
+    def execute(self, ctx: EvaluationContext) -> Any:
+        entry = ctx.engine.resolve_action(self.name, ctx.local_context)
+        return entry.func(*self.args, **self.kwargs)

@@ -14,7 +14,7 @@ __all__ = ["DecimalDataType"]
 
 @data_type("decimal")
 class DecimalDataType(DataType[Decimal]):
-    def cast(self, value: str) -> Decimal:
+    def do_cast(self, value: str) -> Decimal:
         return Decimal(value)
 
     def __str__(self, value: Decimal) -> str:  # type: ignore[override]

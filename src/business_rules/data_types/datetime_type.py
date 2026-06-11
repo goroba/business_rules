@@ -14,7 +14,7 @@ __all__ = ["DateTimeDataType"]
 
 @data_type("datetime")
 class DateTimeDataType(DataType[datetime]):
-    def cast(self, value: str) -> datetime:
+    def do_cast(self, value: str) -> datetime:
         return datetime.fromisoformat(value)
 
     def __str__(self, value: datetime) -> str:  # type: ignore[override]

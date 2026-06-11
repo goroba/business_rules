@@ -36,7 +36,7 @@ def test_register_rejects_empty_name() -> None:
 
         @data_type("")
         class EmptyNameDataType(DataType[str]):
-            def cast(self, value: str) -> str:
+            def do_cast(self, value: str) -> str:
                 return value
 
             def __str__(self, value: str) -> str:  # type: ignore[override]
@@ -48,7 +48,7 @@ def test_register_rejects_duplicate_name() -> None:
 
         @data_type("string")
         class DuplicateStringDataType(DataType[str]):
-            def cast(self, value: str) -> str:
+            def do_cast(self, value: str) -> str:
                 return value
 
             def __str__(self, value: str) -> str:  # type: ignore[override]

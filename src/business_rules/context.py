@@ -13,12 +13,7 @@ from business_rules.name_normalizers import NameNormalizer, SnakeCaseNameNormali
 
 __all__ = [
     "Context",
-    "GlobalContext",
     "RegisteredEntry",
-    "action",
-    "function",
-    "get_global_context",
-    "variable",
 ]
 
 _CallableT = TypeVar("_CallableT", bound=Callable[..., Any])
@@ -43,6 +38,25 @@ def _resolve_name(name: str | None, obj: Callable[..., Any]) -> str:
     if not resolved_name:
         raise ValueError("Name must not be empty")
     return resolved_name
+
+
+def _make_registration_decorator(
+    register: Callable[[str, Callable[..., Any], str], None],
+) -> Callable[..., Callable[[_CallableT], _CallableT]]:
+    def decorator_factory(
+        name: str | None = None,
+        *,
+        data_type: str,
+    ) -> Callable[[_CallableT], _CallableT]:
+        def decorator(obj: _CallableT) -> _CallableT:
+            _validate_callable_target(obj)
+            resolved_name = _resolve_name(name, obj)
+            register(resolved_name, obj, data_type)
+            return obj
+
+        return decorator
+
+    return decorator_factory
 
 
 class Context:
@@ -110,70 +124,6 @@ class Context:
         _validate_callable_target(func)
         self._register(self._functions, "Function", name, func, data_type)
 
-    def _get_with_fallback(
-        self,
-        registry: dict[str, RegisteredEntry],
-        global_registry: dict[str, RegisteredEntry],
-        kind: str,
-        name: str,
-        normalized_name: str,
-    ) -> RegisteredEntry:
-        try:
-            return registry[normalized_name]
-        except KeyError as exc:
-            try:
-                return global_registry[normalized_name]
-            except KeyError:
-                raise KeyError(f"{kind} {name!r} is not registered") from exc
-
-    def get_variable(self, name: str) -> RegisteredEntry:
-        global_ctx = get_global_context()
-        normalized_name = self._normalize_entry_name(name)
-        return self._get_with_fallback(
-            self._variables,
-            global_ctx._variables,
-            "Variable",
-            name,
-            normalized_name,
-        )
-
-    def get_action(self, name: str) -> RegisteredEntry:
-        global_ctx = get_global_context()
-        normalized_name = self._normalize_entry_name(name)
-        return self._get_with_fallback(
-            self._actions,
-            global_ctx._actions,
-            "Action",
-            name,
-            normalized_name,
-        )
-
-    def get_function(self, name: str) -> RegisteredEntry:
-        global_ctx = get_global_context()
-        normalized_name = self._normalize_entry_name(name)
-        return self._get_with_fallback(
-            self._functions,
-            global_ctx._functions,
-            "Function",
-            name,
-            normalized_name,
-        )
-
-
-class GlobalContext(Context):
-    _instance: GlobalContext | None = None
-
-    def __new__(cls) -> GlobalContext:
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def __init__(self) -> None:
-        if getattr(self, "_initialized", False):
-            return
-        super().__init__()
-        self._initialized = True
-
     def get_variable(self, name: str) -> RegisteredEntry:
         normalized_name = self._normalize_entry_name(name)
         try:
@@ -195,38 +145,23 @@ class GlobalContext(Context):
         except KeyError as exc:
             raise KeyError(f"Function {name!r} is not registered") from exc
 
-
-def get_global_context() -> GlobalContext:
-    return GlobalContext()
-
-
-def _make_registration_decorator(
-    register: Callable[[Context, str, Callable[..., Any], str], None],
-) -> Callable[..., Callable[[_CallableT], _CallableT]]:
-    def decorator_factory(
-        name: str | None = None,
-        *,
-        context: Context | None = None,
-        data_type: str,
+    def variable(
+        self, name: str | None = None, *, data_type: str
     ) -> Callable[[_CallableT], _CallableT]:
-        def decorator(obj: _CallableT) -> _CallableT:
-            _validate_callable_target(obj)
-            resolved_name = _resolve_name(name, obj)
-            target = context or get_global_context()
-            register(target, resolved_name, obj, data_type)
-            return obj
+        return _make_registration_decorator(self.register_variable)(
+            name, data_type=data_type
+        )
 
-        return decorator
+    def action(
+        self, name: str | None = None, *, data_type: str
+    ) -> Callable[[_CallableT], _CallableT]:
+        return _make_registration_decorator(self.register_action)(
+            name, data_type=data_type
+        )
 
-    return decorator_factory
-
-
-variable = _make_registration_decorator(
-    lambda ctx, name, func, data_type: ctx.register_variable(name, func, data_type)
-)
-action = _make_registration_decorator(
-    lambda ctx, name, func, data_type: ctx.register_action(name, func, data_type)
-)
-function = _make_registration_decorator(
-    lambda ctx, name, func, data_type: ctx.register_function(name, func, data_type)
-)
+    def function(
+        self, name: str | None = None, *, data_type: str
+    ) -> Callable[[_CallableT], _CallableT]:
+        return _make_registration_decorator(self.register_function)(
+            name, data_type=data_type
+        )

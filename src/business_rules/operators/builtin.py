@@ -19,16 +19,10 @@ __all__ = [
     "LteOperator",
     "MatchesOperator",
     "NeOperator",
-    "NegOperator",
     "NotContainsOperator",
     "NotOperator",
     "StartsWithOperator",
 ]
-
-
-@unary("neg")
-class NegOperator(UnaryOperator):
-    pass
 
 
 @unary("is_null")

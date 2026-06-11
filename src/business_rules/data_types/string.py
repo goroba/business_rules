@@ -14,7 +14,7 @@ __all__ = ["StringDataType"]
 
 @data_type("string")
 class StringDataType(DataType[str]):
-    def cast(self, value: str) -> str:
+    def do_cast(self, value: str) -> str:
         return value
 
     def __str__(self, value: str) -> str:  # type: ignore[override]

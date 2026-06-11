@@ -13,7 +13,7 @@ __all__ = ["IntegerDataType"]
 
 @data_type("integer")
 class IntegerDataType(DataType[int]):
-    def cast(self, value: str) -> int:
+    def do_cast(self, value: str) -> int:
         return int(value)
 
     def __str__(self, value: int) -> str:  # type: ignore[override]

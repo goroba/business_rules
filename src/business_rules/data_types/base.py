@@ -43,11 +43,19 @@ class DataType(Generic[T], ABC):
         cls._implementations = implementations
         cls.operators = frozenset(operator_names)
 
+    def cast(self, value: str | T) -> T:
+        if isinstance(value, str):
+            return self.do_cast(value)
+        return value
+
     @abstractmethod
-    def cast(self, value: str) -> T: ...
+    def do_cast(self, value: str) -> T: ...
 
     @abstractmethod
     def __str__(self, value: T) -> str: ...  # type: ignore[override]
+
+    def __bool__(self, value: T) -> bool:  # type: ignore[override]
+        return bool(value)
 
     def apply(self, name: str, *args: Any) -> bool:
         try:

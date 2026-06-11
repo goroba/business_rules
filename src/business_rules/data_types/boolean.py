@@ -14,7 +14,7 @@ _FALSY = frozenset({"false", "0", "no"})
 
 @data_type("boolean")
 class BooleanDataType(DataType[bool]):
-    def cast(self, value: str) -> bool:
+    def do_cast(self, value: str) -> bool:
         normalized = value.strip().lower()
         if normalized in _TRUTHY:
             return True
@@ -24,10 +24,6 @@ class BooleanDataType(DataType[bool]):
 
     def __str__(self, value: bool) -> str:  # type: ignore[override]
         return "true" if value else "false"
-
-    @implements("neg")
-    def neg(self, value: bool) -> bool:
-        return not value
 
     @implements("is_null")
     def is_null(self, value: bool | None) -> bool:

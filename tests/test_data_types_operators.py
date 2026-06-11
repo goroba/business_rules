@@ -29,15 +29,15 @@ _ORDERED_OPERATORS = frozenset(
 def test_boolean_data_type() -> None:
     data_type = BooleanDataType()
     assert data_type.operators == frozenset(
-        {"eq", "ne", "neg", "is_null", "is_not_null"}
+        {"eq", "ne", "is_null", "is_not_null"}
     )
     assert data_type.cast("true") is True
     assert data_type.cast("FALSE") is False
     assert data_type.cast("1") is True
     assert data_type.cast("0") is False
     assert data_type.__str__(True) == "true"
-    assert data_type.neg(True) is False
-    assert data_type.neg(False) is True
+    assert data_type.__bool__(True) is True
+    assert data_type.__bool__(False) is False
     assert data_type.is_null(None) is True
     assert data_type.is_null(False) is False
     assert data_type.is_not_null(False) is True
@@ -66,6 +66,8 @@ def test_string_data_type() -> None:
     )
     assert data_type.cast("hello") == "hello"
     assert data_type.__str__("hello") == "hello"
+    assert data_type.__bool__("hello") is True
+    assert data_type.__bool__("") is False
     assert data_type.is_null(None) is True
     assert data_type.is_not_null("x") is True
     assert data_type.eq("a", "a") is True
@@ -101,6 +103,8 @@ def test_integer_data_type() -> None:
     assert data_type.operators == _ORDERED_OPERATORS
     assert data_type.cast("42") == 42
     assert data_type.__str__(42) == "42"
+    assert data_type.__bool__(42) is True
+    assert data_type.__bool__(0) is False
     assert data_type.is_null(None) is True
     assert data_type.is_not_null(1) is True
     assert data_type.eq(1, 1) is True
@@ -129,6 +133,8 @@ def test_decimal_data_type() -> None:
     assert data_type.operators == _ORDERED_OPERATORS
     assert data_type.cast("1.5") == Decimal("1.5")
     assert data_type.__str__(Decimal("1.5")) == "1.5"
+    assert data_type.__bool__(Decimal("1.5")) is True
+    assert data_type.__bool__(Decimal("0")) is False
     assert data_type.is_null(None) is True
     assert data_type.is_not_null(Decimal("1")) is True
     assert data_type.eq(Decimal("1.0"), Decimal("1.0")) is True
@@ -156,6 +162,7 @@ def test_date_data_type() -> None:
     other = date(2024, 2, 1)
     assert data_type.cast("2024-01-15") == value
     assert data_type.__str__(value) == "2024-01-15"
+    assert data_type.__bool__(value) is True
     assert data_type.is_null(None) is True
     assert data_type.is_not_null(value) is True
     assert data_type.eq(value, value) is True
@@ -183,6 +190,7 @@ def test_datetime_data_type() -> None:
     other = datetime(2024, 1, 15, 12, 0, 0)
     assert data_type.cast("2024-01-15T10:30:00") == value
     assert data_type.__str__(value) == "2024-01-15T10:30:00"
+    assert data_type.__bool__(value) is True
     assert data_type.is_null(None) is True
     assert data_type.is_not_null(value) is True
     assert data_type.eq(value, value) is True

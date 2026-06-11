@@ -9,7 +9,7 @@ def test_data_type_rejects_unregistered_operator() -> None:
     with pytest.raises(ValueError, match="not registered"):
 
         class BadDataType(DataType[str]):
-            def cast(self, value: str) -> str:
+            def do_cast(self, value: str) -> str:
                 return value
 
             def __str__(self, value: str) -> str:  # type: ignore[override]
@@ -29,7 +29,7 @@ def test_data_type_rejects_non_string_operator_name() -> None:
     with pytest.raises(TypeError, match="must be a string"):
 
         class BadNameDataType(DataType[str]):
-            def cast(self, value: str) -> str:
+            def do_cast(self, value: str) -> str:
                 return value
 
             def __str__(self, value: str) -> str:  # type: ignore[override]

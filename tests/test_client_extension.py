@@ -2,7 +2,7 @@ import pytest
 
 from business_rules.condition import BinaryCondition
 from business_rules.data_types import DataType, DataTypesPool, data_type
-from business_rules.operand import Value
+from business_rules.operand import Literal
 from business_rules.operators import BinaryOperator, OperatorsPool, binary, implements
 
 
@@ -13,7 +13,7 @@ class BetweenOperator(BinaryOperator):
 
 @data_type("range_integer")
 class RangeIntegerDataType(DataType[int]):
-    def cast(self, value: str) -> int:
+    def do_cast(self, value: str) -> int:
         return int(value)
 
     def __str__(self, value: int) -> str:  # type: ignore[override]
@@ -41,9 +41,9 @@ def test_client_custom_data_type() -> None:
 
 def test_client_custom_operator_in_condition() -> None:
     condition = BinaryCondition(
-        left=Value("5"),
+        left=Literal("5"),
         operator=BetweenOperator,
-        right=Value("10"),
+        right=Literal("10"),
     )
     assert condition.operator is BetweenOperator
 
@@ -61,7 +61,7 @@ def test_client_cannot_override_builtin_data_type() -> None:
 
         @data_type("string")
         class ClientStringDataType(DataType[str]):
-            def cast(self, value: str) -> str:
+            def do_cast(self, value: str) -> str:
                 return value
 
             def __str__(self, value: str) -> str:  # type: ignore[override]
