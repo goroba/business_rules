@@ -193,14 +193,37 @@ def test_binary_condition_evaluate_two_variables_mismatched_types_raises(
         condition.evaluate(ctx)
 
 
-def test_binary_condition_evaluate_two_literals_raises(ctx: EvaluationContext) -> None:
+def test_binary_condition_evaluate_two_literals_string_eq(
+    ctx: EvaluationContext,
+) -> None:
+    condition = BinaryCondition(
+        left=Literal("true"),
+        operator=EqOperator,
+        right=Literal("some text"),
+    )
+    assert condition.evaluate(ctx) is False
+
+
+def test_binary_condition_evaluate_two_literals_decimal_gt(
+    ctx: EvaluationContext,
+) -> None:
+    condition = BinaryCondition(
+        left=Literal("1"),
+        operator=GtOperator,
+        right=Literal("1.5"),
+    )
+    assert condition.evaluate(ctx) is False
+
+
+def test_binary_condition_evaluate_two_literals_integer_eq(
+    ctx: EvaluationContext,
+) -> None:
     condition = BinaryCondition(
         left=Literal("5"),
         operator=EqOperator,
         right=Literal("10"),
     )
-    with pytest.raises(TypeError, match="DataTypeAwareOperand"):
-        condition.evaluate(ctx)
+    assert condition.evaluate(ctx) is False
 
 
 def test_iterable_condition_evaluate_raises(ctx: EvaluationContext) -> None:

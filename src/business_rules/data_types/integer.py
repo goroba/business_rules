@@ -16,6 +16,13 @@ class IntegerDataType(DataType[int]):
     def do_cast(self, value: str) -> int:
         return int(value)
 
+    def guess(self, value: str) -> bool:
+        try:
+            int(value)
+        except ValueError:
+            return False
+        return True
+
     def __str__(self, value: int) -> str:  # type: ignore[override]
         return str(value)
 

@@ -22,6 +22,10 @@ class BooleanDataType(DataType[bool]):
             return False
         raise ValueError(f"Invalid boolean value: {value!r}")
 
+    def guess(self, value: str) -> bool:
+        normalized = value.strip().lower()
+        return normalized in ['true', 'false']
+
     def __str__(self, value: bool) -> str:  # type: ignore[override]
         return "true" if value else "false"
 

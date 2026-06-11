@@ -6,12 +6,14 @@ from business_rules.data_types.date import DateDataType
 from business_rules.data_types.datetime_type import DateTimeDataType
 from business_rules.data_types.decimal import DecimalDataType
 from business_rules.data_types.integer import IntegerDataType
+from business_rules.data_types.guesser_pool import DataTypeGuesserPool
 from business_rules.data_types.pool import DataTypesPool, data_type
 from business_rules.data_types.string import StringDataType
 
 __all__ = [
     "BooleanDataType",
     "DataType",
+    "DataTypeGuesserPool",
     "DataTypesPool",
     "DateDataType",
     "DateTimeDataType",

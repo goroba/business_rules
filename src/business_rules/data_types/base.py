@@ -51,6 +51,9 @@ class DataType(Generic[T], ABC):
     @abstractmethod
     def do_cast(self, value: str) -> T: ...
 
+    def guess(self, value: str) -> bool:
+        return False
+
     @abstractmethod
     def __str__(self, value: T) -> str: ...  # type: ignore[override]
 

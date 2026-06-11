@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Collection
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from business_rules.data_types.base import DataType
 from business_rules.data_types.pool import data_type
@@ -16,6 +16,13 @@ __all__ = ["DecimalDataType"]
 class DecimalDataType(DataType[Decimal]):
     def do_cast(self, value: str) -> Decimal:
         return Decimal(value)
+
+    def guess(self, value: str) -> bool:
+        try:
+            Decimal(value)
+        except InvalidOperation:
+            return False
+        return True
 
     def __str__(self, value: Decimal) -> str:  # type: ignore[override]
         return format(value, "f")

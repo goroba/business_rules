@@ -48,6 +48,9 @@ def test_boolean_data_type() -> None:
     assert data_type.ne(False, False) is False
     with pytest.raises(ValueError, match="Invalid boolean"):
         data_type.cast("maybe")
+    assert data_type.guess("true") is True
+    assert data_type.guess("0") is True
+    assert data_type.guess("maybe") is False
     with pytest.raises(NotImplementedError):
         data_type.apply("contains", "a", "b")
     assert data_type.apply("eq", True, True) is True
@@ -96,6 +99,8 @@ def test_string_data_type() -> None:
     assert data_type.is_in("c", ("a", "b")) is False
     assert data_type.is_not_in("c", ("a", "b")) is True
     assert data_type.is_not_in("a", ("a", "b")) is False
+    assert data_type.guess("hello") is True
+    assert data_type.guess("") is True
 
 
 def test_integer_data_type() -> None:
@@ -126,6 +131,9 @@ def test_integer_data_type() -> None:
     with pytest.raises(NotImplementedError):
         data_type.apply("contains", 1, 2)
     assert data_type.apply("eq", 1, 1) is True
+    assert data_type.guess("42") is True
+    assert data_type.guess("3.14") is False
+    assert data_type.guess("abc") is False
 
 
 def test_decimal_data_type() -> None:
@@ -153,6 +161,8 @@ def test_decimal_data_type() -> None:
     assert data_type.is_in(Decimal("3"), (Decimal("1"), Decimal("2"))) is False
     assert data_type.is_not_in(Decimal("3"), (Decimal("1"), Decimal("2"))) is True
     assert data_type.is_not_in(Decimal("2"), (Decimal("1"), Decimal("2"))) is False
+    assert data_type.guess("1.5") is True
+    assert data_type.guess("abc") is False
 
 
 def test_date_data_type() -> None:
@@ -181,6 +191,9 @@ def test_date_data_type() -> None:
     assert data_type.is_in(date(2023, 1, 1), (value, other)) is False
     assert data_type.is_not_in(date(2023, 1, 1), (value, other)) is True
     assert data_type.is_not_in(value, (value, other)) is False
+    assert data_type.guess("2024-01-15") is True
+    assert data_type.guess("2024-01-15T10:30:00") is False
+    assert data_type.guess("not-a-date") is False
 
 
 def test_datetime_data_type() -> None:
@@ -209,3 +222,6 @@ def test_datetime_data_type() -> None:
     assert data_type.is_in(datetime(2023, 1, 1), (value, other)) is False
     assert data_type.is_not_in(datetime(2023, 1, 1), (value, other)) is True
     assert data_type.is_not_in(value, (value, other)) is False
+    assert data_type.guess("2024-01-15T10:30:00") is True
+    assert data_type.guess("2024-01-15") is True
+    assert data_type.guess("not-a-datetime") is False

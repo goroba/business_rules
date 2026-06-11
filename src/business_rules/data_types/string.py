@@ -17,6 +17,9 @@ class StringDataType(DataType[str]):
     def do_cast(self, value: str) -> str:
         return value
 
+    def guess(self, value: str) -> bool:
+        return True
+
     def __str__(self, value: str) -> str:  # type: ignore[override]
         return value
 

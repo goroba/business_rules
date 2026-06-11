@@ -9,6 +9,9 @@ class SampleDataType(DataType[str]):
     def do_cast(self, value: str) -> str:
         return value
 
+    def guess(self, value: str) -> bool:
+        return True
+
     def __str__(self, value: str) -> str:  # type: ignore[override]
         return value
 
@@ -21,6 +24,11 @@ class CastOnlyDataType(DataType[str]):
 class StrOnlyDataType(DataType[str]):
     def __str__(self, value: str) -> str:  # type: ignore[override]
         return value
+
+
+class GuessOnlyDataType(DataType[str]):
+    def guess(self, value: str) -> bool:
+        return True
 
 
 def test_data_type_cannot_be_instantiated() -> None:
@@ -36,6 +44,11 @@ def test_incomplete_subclass_missing_str_cannot_be_instantiated() -> None:
 def test_incomplete_subclass_missing_do_cast_cannot_be_instantiated() -> None:
     with pytest.raises(TypeError):
         StrOnlyDataType()  # type: ignore[abstract]
+
+
+def test_incomplete_subclass_missing_guess_cannot_be_instantiated() -> None:
+    with pytest.raises(TypeError):
+        GuessOnlyDataType()  # type: ignore[abstract]
 
 
 def test_sample_data_type() -> None:

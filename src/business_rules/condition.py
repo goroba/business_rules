@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from business_rules.data_types.guesser_pool import DataTypeGuesserPool
 from business_rules.data_types.pool import DataTypesPool
 from business_rules.evaluation import EvaluationContext
 from business_rules.operand import DataTypeAwareOperand, Operand
@@ -57,8 +58,15 @@ class BinaryCondition(Condition):
     def evaluate(self, ctx: EvaluationContext) -> bool:
         left_aware = isinstance(self.left, DataTypeAwareOperand)
         right_aware = isinstance(self.right, DataTypeAwareOperand)
+
         if not left_aware and not right_aware:
-            raise TypeError("At least one operand must be a DataTypeAwareOperand")
+            left_raw = self.left.evaluate(ctx)
+            right_raw = self.right.evaluate(ctx)
+            data_type_cls = DataTypeGuesserPool.guess_pair(
+                str(left_raw), str(right_raw), operator=self.operator.name
+            )
+            data_type = data_type_cls()
+            return data_type.apply(self.operator.name, data_type.cast(left_raw), data_type.cast(right_raw))
 
         if left_aware and right_aware:
             data_type_name = self.left.data_type(ctx)

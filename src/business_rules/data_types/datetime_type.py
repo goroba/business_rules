@@ -17,6 +17,13 @@ class DateTimeDataType(DataType[datetime]):
     def do_cast(self, value: str) -> datetime:
         return datetime.fromisoformat(value)
 
+    def guess(self, value: str) -> bool:
+        try:
+            datetime.fromisoformat(value)
+        except ValueError:
+            return False
+        return True
+
     def __str__(self, value: datetime) -> str:  # type: ignore[override]
         return value.isoformat()
 
