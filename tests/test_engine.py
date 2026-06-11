@@ -7,6 +7,7 @@ from business_rules.condition import Condition
 from business_rules.context import Context
 from business_rules.engine import Engine
 from business_rules.evaluation import EvaluationContext
+from business_rules.executable import Action
 from business_rules.name_normalizers import (
     CamelCaseNameNormalizer,
     SnakeCaseNameNormalizer,
@@ -22,6 +23,12 @@ def engine() -> Engine:
 class TrueCondition(Condition):
     def evaluate(self, ctx: EvaluationContext) -> bool:
         return True
+
+
+@dataclass
+class FalseCondition(Condition):
+    def evaluate(self, ctx: EvaluationContext) -> bool:
+        return False
 
 
 def test_engine_defaults_to_snake_case_normalizer(engine: Engine) -> None:
@@ -167,5 +174,72 @@ def test_global_context_get_methods_normalize_search_names(engine: Engine) -> No
 
 def test_run_accepts_business_rule_and_optional_context(engine: Engine) -> None:
     rule = BusinessRule(having=TrueCondition())
-    engine.run(rule)
-    engine.run(rule, local_context=Context())
+    assert engine.run(rule) is True
+    assert engine.run(rule, local_context=Context()) is True
+
+
+def test_run_executes_success_and_finally_lifecycle(engine: Engine) -> None:
+    calls: list[str] = []
+
+    @engine.action("on_success", data_type="boolean")
+    def on_success() -> bool:
+        calls.append("success")
+        return True
+
+    @engine.action("on_finally", data_type="boolean")
+    def on_finally() -> bool:
+        calls.append("finally")
+        return True
+
+    rule = BusinessRule(
+        having=TrueCondition(),
+        on_success=[Action(name="on_success")],
+        on_finally=[Action(name="on_finally")],
+    )
+    assert engine.run(rule) is True
+    assert calls == ["success", "finally"]
+
+
+def test_run_executes_failure_and_finally_lifecycle(engine: Engine) -> None:
+    calls: list[str] = []
+
+    @engine.action("on_failure", data_type="boolean")
+    def on_failure() -> bool:
+        calls.append("failure")
+        return False
+
+    @engine.action("on_finally", data_type="boolean")
+    def on_finally() -> bool:
+        calls.append("finally")
+        return True
+
+    rule = BusinessRule(
+        having=FalseCondition(),
+        on_failure=[Action(name="on_failure")],
+        on_finally=[Action(name="on_finally")],
+    )
+    assert engine.run(rule) is False
+    assert calls == ["failure", "finally"]
+
+
+def test_run_uses_local_context_for_lifecycle_actions(engine: Engine) -> None:
+    calls: list[str] = []
+
+    @engine.action("notify", data_type="string")
+    def global_notify() -> str:
+        calls.append("global")
+        return "global"
+
+    local_ctx = Context()
+
+    @local_ctx.action("notify", data_type="string")
+    def local_notify() -> str:
+        calls.append("local")
+        return "local"
+
+    rule = BusinessRule(
+        having=TrueCondition(),
+        on_success=[Action(name="notify")],
+    )
+    engine.run(rule, local_context=local_ctx)
+    assert calls == ["local"]

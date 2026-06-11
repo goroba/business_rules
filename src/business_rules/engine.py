@@ -96,7 +96,17 @@ class Engine:
         self,
         business_rule: BusinessRule,
         local_context: Context | None = None,
-    ) -> None:
-        """Execute a business rule against the optional local context."""
+    ) -> bool:
+        """Evaluate a business rule and run its lifecycle actions."""
         ctx = EvaluationContext(self, local_context)
-        business_rule.evaluate(ctx)
+        result = business_rule.evaluate(ctx)
+        if result:
+            for action in business_rule.on_success or []:
+                action.execute(ctx)
+        else:
+            for action in business_rule.on_failure or []:
+                action.execute(ctx)
+        for action in business_rule.on_finally or []:
+            action.execute(ctx)
+
+        return result
