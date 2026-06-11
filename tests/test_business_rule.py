@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 
-from business_rules.action import Action
+from business_rules.executable import Action
 from business_rules.business_rule import BusinessRule
 from business_rules.condition import BinaryCondition, Condition
-from business_rules.operand import Operand
+from business_rules.operand import Value, Variable
 from business_rules.operators import EqOperator, GtOperator
 
 
@@ -21,9 +21,9 @@ class FalseCondition(Condition):
 
 def test_business_rule_with_condition_only() -> None:
     condition = BinaryCondition(
-        left=Operand("status"),
+        left=Variable("status"),
         operator=EqOperator,
-        right=Operand("active"),
+        right=Value("active"),
     )
     rule = BusinessRule(condition=condition)
     assert rule.condition == condition
@@ -34,13 +34,13 @@ def test_business_rule_with_condition_only() -> None:
 
 def test_business_rule_with_all_fields() -> None:
     condition = BinaryCondition(
-        left=Operand("age"),
+        left=Variable("age"),
         operator=GtOperator,
-        right=Operand(18),
+        right=Value("18"),
     )
-    on_success = [Action()]
-    on_failure = [Action()]
-    on_finally = [Action()]
+    on_success = [Action(name="on_success")]
+    on_failure = [Action(name="on_failure")]
+    on_finally = [Action(name="on_finally")]
     rule = BusinessRule(
         condition=condition,
         on_success=on_success,

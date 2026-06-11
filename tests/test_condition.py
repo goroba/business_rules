@@ -8,10 +8,9 @@ from business_rules.condition import (
     Conjunction,
     Disjunction,
     IterableCondition,
-    Negation,
     UnaryCondition,
 )
-from business_rules.operand import Operand
+from business_rules.operand import Value, Variable
 from business_rules.operators import EqOperator, GtOperator, IsNullOperator, NotOperator
 
 
@@ -32,15 +31,15 @@ def test_condition() -> None:
 
 
 def test_unary_condition() -> None:
-    operand = Operand("field")
-    condition = UnaryCondition(operand=operand, operator=IsNullOperator)
-    assert condition.operand == operand
+    verifiable = Variable("field")
+    condition = UnaryCondition(verifiable=verifiable, operator=IsNullOperator)
+    assert condition.verifiable == verifiable
     assert condition.operator is IsNullOperator
 
 
 def test_binary_condition() -> None:
-    left = Operand("age")
-    right = Operand(18)
+    left = Variable("age")
+    right = Value("18")
     condition = BinaryCondition(left=left, operator=GtOperator, right=right)
     assert condition.left == left
     assert condition.operator is GtOperator
@@ -54,14 +53,14 @@ def test_iterable_condition() -> None:
 
 def test_conjunction() -> None:
     first = BinaryCondition(
-        left=Operand("a"),
+        left=Variable("a"),
         operator=EqOperator,
-        right=Operand(1),
+        right=Value("1"),
     )
     second = BinaryCondition(
-        left=Operand("b"),
+        left=Variable("b"),
         operator=EqOperator,
-        right=Operand(2),
+        right=Value("2"),
     )
     condition = Conjunction(all=(first, second))
     assert condition.all == (first, second)
@@ -70,28 +69,28 @@ def test_conjunction() -> None:
 
 def test_disjunction() -> None:
     first = BinaryCondition(
-        left=Operand("a"),
+        left=Variable("a"),
         operator=EqOperator,
-        right=Operand(1),
+        right=Value("1"),
     )
     second = BinaryCondition(
-        left=Operand("b"),
+        left=Variable("b"),
         operator=EqOperator,
-        right=Operand(2),
+        right=Value("2"),
     )
     condition = Disjunction(any=(first, second))
     assert condition.any == (first, second)
     assert list(condition) == [first, second]
 
 
-def test_negation() -> None:
+def test_not_operator_condition() -> None:
     inner = BinaryCondition(
-        left=Operand("age"),
+        left=Variable("age"),
         operator=GtOperator,
-        right=Operand(18),
+        right=Value("18"),
     )
-    condition = Negation(operand=Operand(inner), operator=NotOperator)
-    assert condition.operand.value == inner
+    condition = UnaryCondition(verifiable=inner, operator=NotOperator)
+    assert condition.verifiable == inner
     assert condition.operator is NotOperator
     assert condition.operator.name == "not"
 
@@ -104,16 +103,16 @@ def test_condition_verify_raises() -> None:
 def test_unary_condition_verify_raises() -> None:
     with pytest.raises(NotImplementedError):
         UnaryCondition(
-            operand=Operand("field"),
+            verifiable=Variable("field"),
             operator=IsNullOperator,
         ).verify()
 
 
 def test_binary_condition_verify_is_stub() -> None:
     condition = BinaryCondition(
-        left=Operand("age"),
+        left=Variable("age"),
         operator=GtOperator,
-        right=Operand(18),
+        right=Value("18"),
     )
     condition.verify()
 
@@ -133,9 +132,9 @@ def test_disjunction_verify() -> None:
     assert Disjunction(any=(FalseCondition(), FalseCondition())).verify() is False
 
 
-def test_negation_verify() -> None:
-    condition = Negation(
-        operand=Operand(TrueCondition()),
-        operator=NotOperator,
-    )
-    assert condition.verify() is False
+def test_not_operator_condition_verify_raises() -> None:
+    with pytest.raises(NotImplementedError):
+        UnaryCondition(
+            verifiable=TrueCondition(),
+            operator=NotOperator,
+        ).verify()

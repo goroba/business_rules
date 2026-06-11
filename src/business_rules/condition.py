@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from business_rules.operand import Operand
 from business_rules.operators.base import BinaryOperator, UnaryOperator
+from business_rules.verifiable import Verifiable
 
 __all__ = [
     "BinaryCondition",
@@ -14,32 +15,23 @@ __all__ = [
     "Conjunction",
     "Disjunction",
     "IterableCondition",
-    "Negation",
     "UnaryCondition",
 ]
 
 
 @dataclass
-class Condition:
+class Condition(Verifiable):
     def verify(self) -> bool:
         raise NotImplementedError
 
 
 @dataclass
 class UnaryCondition(Condition):
-    operand: Operand
+    verifiable: Verifiable
     operator: type[UnaryOperator]
 
     def verify(self) -> bool:
         raise NotImplementedError
-
-
-@dataclass
-class Negation(UnaryCondition):
-    operand: Operand
-
-    def verify(self) -> bool:
-        return not self.operand.value.verify()
 
 
 @dataclass

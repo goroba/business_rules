@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from business_rules.action import Action
+from business_rules.executable import Action
 from business_rules.condition import Condition
 
 __all__ = ["BusinessRule"]

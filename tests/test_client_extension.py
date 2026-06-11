@@ -2,7 +2,7 @@ import pytest
 
 from business_rules.condition import BinaryCondition
 from business_rules.data_types import DataType, DataTypesPool, data_type
-from business_rules.operand import Operand
+from business_rules.operand import Value
 from business_rules.operators import BinaryOperator, OperatorsPool, binary, implements
 
 
@@ -41,9 +41,9 @@ def test_client_custom_data_type() -> None:
 
 def test_client_custom_operator_in_condition() -> None:
     condition = BinaryCondition(
-        left=Operand(5),
+        left=Value("5"),
         operator=BetweenOperator,
-        right=Operand(10),
+        right=Value("10"),
     )
     assert condition.operator is BetweenOperator
 
