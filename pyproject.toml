@@ -23,19 +23,15 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-sqlalchemy2 = [
-    "sqlalchemy>=2.0,<3",
-]
 dev = [
     "mypy>=1.15",
     "pytest>=8.3",
     "pytest-cov>=6.0",
     "ruff>=0.9",
-    "sqlalchemy>=2.0,<3",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/business_rules", "src/bridges"]
+packages = ["src/business_rules"]
 
 [tool.hatch.build]
 include = [
@@ -63,7 +59,7 @@ select = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["bridges", "business_rules"]
+known-first-party = ["business_rules"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -71,10 +67,10 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 mypy_path = "src"
-packages = ["bridges", "business_rules"]
+packages = ["business_rules"]
 
 [tool.coverage.run]
-source = ["bridges", "business_rules"]
+source = ["business_rules"]
 branch = true
 
 [tool.coverage.report]
