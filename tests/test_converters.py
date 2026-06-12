@@ -1,4 +1,4 @@
-"""Tests for business rule translators."""
+"""Tests for business rule converters."""
 
 from __future__ import annotations
 
@@ -10,9 +10,9 @@ import pytest
 
 from business_rules.business_rule import BusinessRule
 from business_rules.condition import BinaryCondition, Condition, UnaryCondition
+from business_rules.converters import DictConverter, JsonConverter
 from business_rules.operand import Literal, Operand, Variable
 from business_rules.operators import EqOperator, IsNotNullOperator
-from business_rules.translators import DictTranslator, JsonTranslator
 from test_complex_business_rule import _build_rule
 
 _COMPLEX_ELIGIBILITY_RULE_JSON = """
@@ -250,30 +250,30 @@ class StubOperand(Operand):
         return None
 
 
-def test_dict_translator_dumps_complex_eligibility_rule() -> None:
-    assert DictTranslator().dump(_build_rule()) == _COMPLEX_ELIGIBILITY_RULE_DICT
+def test_dict_converter_dumps_complex_eligibility_rule() -> None:
+    assert DictConverter().dump(_build_rule()) == _COMPLEX_ELIGIBILITY_RULE_DICT
 
 
-def test_dict_translator_loads_complex_eligibility_rule() -> None:
-    assert DictTranslator().load(_COMPLEX_ELIGIBILITY_RULE_DICT) == _build_rule()
+def test_dict_converter_loads_complex_eligibility_rule() -> None:
+    assert DictConverter().load(_COMPLEX_ELIGIBILITY_RULE_DICT) == _build_rule()
 
 
-def test_json_translator_dumps_complex_eligibility_rule() -> None:
+def test_json_converter_dumps_complex_eligibility_rule() -> None:
     assert (
-        json.loads(JsonTranslator().dump(_build_rule()))
+        json.loads(JsonConverter().dump(_build_rule()))
         == _COMPLEX_ELIGIBILITY_RULE_DICT
     )
 
 
-def test_json_translator_loads_complex_eligibility_rule() -> None:
+def test_json_converter_loads_complex_eligibility_rule() -> None:
     assert (
-        JsonTranslator().load(_COMPLEX_ELIGIBILITY_RULE_JSON)
+        JsonConverter().load(_COMPLEX_ELIGIBILITY_RULE_JSON)
         == _build_rule()
     )
 
 
-def test_dict_translator_round_trip_minimal_rule() -> None:
-    translator = DictTranslator()
+def test_dict_converter_round_trip_minimal_rule() -> None:
+    converter = DictConverter()
     rule = BusinessRule(
         having=BinaryCondition(
             left=Variable("status"),
@@ -282,26 +282,26 @@ def test_dict_translator_round_trip_minimal_rule() -> None:
         )
     )
 
-    restored = translator.load(translator.dump(rule))
+    restored = converter.load(converter.dump(rule))
 
     assert restored == rule
-    assert "on_success" not in translator.dump(rule)
-    assert "on_failure" not in translator.dump(rule)
-    assert "on_finally" not in translator.dump(rule)
+    assert "on_success" not in converter.dump(rule)
+    assert "on_failure" not in converter.dump(rule)
+    assert "on_finally" not in converter.dump(rule)
 
 
-def test_dict_translator_unknown_condition_type_raises() -> None:
-    translator = DictTranslator()
+def test_dict_converter_unknown_condition_type_raises() -> None:
+    converter = DictConverter()
 
     with pytest.raises(ValueError, match="Unknown condition type"):
-        translator.load({"having": {"type": "unknown"}})
+        converter.load({"having": {"type": "unknown"}})
 
 
-def test_dict_translator_unknown_operand_type_raises() -> None:
-    translator = DictTranslator()
+def test_dict_converter_unknown_operand_type_raises() -> None:
+    converter = DictConverter()
 
     with pytest.raises(ValueError, match="Unknown operand type"):
-        translator.load(
+        converter.load(
             {
                 "having": {
                     "type": "binary",
@@ -313,11 +313,11 @@ def test_dict_translator_unknown_operand_type_raises() -> None:
         )
 
 
-def test_dict_translator_unknown_operator_raises() -> None:
-    translator = DictTranslator()
+def test_dict_converter_unknown_operator_raises() -> None:
+    converter = DictConverter()
 
     with pytest.raises(KeyError, match="not registered"):
-        translator.load(
+        converter.load(
             {
                 "having": {
                     "type": "binary",
@@ -329,11 +329,11 @@ def test_dict_translator_unknown_operator_raises() -> None:
         )
 
 
-def test_dict_translator_binary_operator_in_unary_slot_raises() -> None:
-    translator = DictTranslator()
+def test_dict_converter_binary_operator_in_unary_slot_raises() -> None:
+    converter = DictConverter()
 
     with pytest.raises(TypeError, match="is not unary"):
-        translator.load(
+        converter.load(
             {
                 "having": {
                     "type": "unary",
@@ -344,11 +344,11 @@ def test_dict_translator_binary_operator_in_unary_slot_raises() -> None:
         )
 
 
-def test_dict_translator_unary_operator_in_binary_slot_raises() -> None:
-    translator = DictTranslator()
+def test_dict_converter_unary_operator_in_binary_slot_raises() -> None:
+    converter = DictConverter()
 
     with pytest.raises(TypeError, match="is not binary"):
-        translator.load(
+        converter.load(
             {
                 "having": {
                     "type": "binary",
@@ -360,11 +360,11 @@ def test_dict_translator_unary_operator_in_binary_slot_raises() -> None:
         )
 
 
-def test_dict_translator_unary_literal_operand_raises() -> None:
-    translator = DictTranslator()
+def test_dict_converter_unary_literal_operand_raises() -> None:
+    converter = DictConverter()
 
     with pytest.raises(TypeError, match="Unary operand must be a DataTypeAwareOperand"):
-        translator.load(
+        converter.load(
             {
                 "having": {
                     "type": "unary",
@@ -375,11 +375,11 @@ def test_dict_translator_unary_literal_operand_raises() -> None:
         )
 
 
-def test_dict_translator_invalid_action_type_raises() -> None:
-    translator = DictTranslator()
+def test_dict_converter_invalid_action_type_raises() -> None:
+    converter = DictConverter()
 
     with pytest.raises(ValueError, match="Expected action node"):
-        translator.load(
+        converter.load(
             {
                 "having": {
                     "type": "binary",
@@ -392,18 +392,18 @@ def test_dict_translator_invalid_action_type_raises() -> None:
         )
 
 
-def test_dict_translator_unsupported_condition_on_dump_raises() -> None:
-    translator = DictTranslator()
+def test_dict_converter_unsupported_condition_on_dump_raises() -> None:
+    converter = DictConverter()
 
     with pytest.raises(TypeError, match="Unsupported condition type"):
-        translator.dump(BusinessRule(having=StubCondition()))
+        converter.dump(BusinessRule(having=StubCondition()))
 
 
-def test_dict_translator_unsupported_operand_on_dump_raises() -> None:
-    translator = DictTranslator()
+def test_dict_converter_unsupported_operand_on_dump_raises() -> None:
+    converter = DictConverter()
 
     with pytest.raises(TypeError, match="Unsupported operand type"):
-        translator.dump(
+        converter.dump(
             BusinessRule(
                 having=BinaryCondition(
                     left=StubOperand(),
@@ -414,16 +414,16 @@ def test_dict_translator_unsupported_operand_on_dump_raises() -> None:
         )
 
 
-def test_json_translator_invalid_json_raises() -> None:
-    translator = JsonTranslator()
+def test_json_converter_invalid_json_raises() -> None:
+    converter = JsonConverter()
 
     with pytest.raises(json.JSONDecodeError):
-        translator.load("not json")
+        converter.load("not json")
 
 
-def test_json_translator_uses_injected_dict_translator() -> None:
-    dict_translator = DictTranslator()
-    json_translator = JsonTranslator(dict_translator=dict_translator)
+def test_json_converter_uses_injected_dict_converter() -> None:
+    dict_converter = DictConverter()
+    json_converter = JsonConverter(dict_converter=dict_converter)
     rule = BusinessRule(
         having=UnaryCondition(
             operand=Variable("email"),
@@ -431,6 +431,6 @@ def test_json_translator_uses_injected_dict_translator() -> None:
         )
     )
 
-    restored = json_translator.load(json_translator.dump(rule))
+    restored = json_converter.load(json_converter.dump(rule))
 
     assert restored == rule

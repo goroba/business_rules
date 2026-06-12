@@ -1,8 +1,8 @@
-# business-rules
+# goroba/business-rules
 
 A Python library for declarative business rules: define conditions with typed operands, store rules in multiple formats, and run them through an engine with a pluggable context.
 
-The typical workflow is **define → store → run**: build a `BusinessRule`, persist it with a translator if needed, register variables/functions/actions on an `Engine`, then call `engine.run(rule)`.
+The typical workflow is **define → store → run**: build a `BusinessRule`, persist it with a converter if needed, register variables/functions/actions on an `Engine`, then call `engine.run(rule)`.
 
 ## Business rule
 
@@ -80,7 +80,52 @@ premium_access_rule = BusinessRule(
 )
 ```
 
-This example uses conjunction, disjunction, negation, unary and binary conditions, variables, literals, functions, and all three lifecycle blocks.
+This example uses conjunction (logial `and`), disjunction (logical `or`), negation(logical `not`), unary and binary conditions, variables, literals, functions, and defines a list of actions for any outcome.
+
+## Business Rule Builder
+
+The builder offers a fluent API to construct rules without nested dataclasses out of the box. Let's create the same rule with premium access:
+
+```python
+from business_rules.builder import binary, function, get_builder, variable
+
+premium_access_rule = (
+    get_builder()
+    .having()
+    .all()
+        .all()
+            .binary(variable("age"), "gte", "18")
+            .binary(variable("status"), "eq", "active")
+            .unary(variable("email"), "is_not_null")
+        .end()
+        .any()
+            .binary(variable("tier"), "eq", "premium")
+            .negative(binary(variable("is_suspended"), "eq", "true"))
+        .end()
+        .binary(
+            variable("region"),
+            "is_in",
+            function("allowed_regions", args=("premium",)),
+        )
+    .end()
+    .on_success()
+        .action("grant_access")
+    .end()
+    .on_failure()
+        .action("reject_access")
+    .end()
+    .on_finally()
+        .action("audit_log")
+    .end()
+    .build()
+)
+```
+
+Helper factories `variable()`, `literal()`, `function()`, `binary()`, and `unary()` are also available for building conditions outside the builder.
+
+## Building blocks
+
+At the highest level business rule consists of three lifecycle blocks: 
 
 | Part | Role |
 |---|---|
@@ -88,6 +133,8 @@ This example uses conjunction, disjunction, negation, unary and binary condition
 | `on_success` | Actions to run when `having` is true |
 | `on_failure` | Actions to run when `having` is false |
 | `on_finally` | Actions to run after success or failure |
+
+The condition block `having` is the only required block, the others are optional, so that you can avoid any specific behaviour, just checking some custom conditions of varying degrees of complexity.
 
 ### Conditions
 
@@ -111,7 +158,7 @@ Literals live inside the rule definition. Variables and functions are registered
 
 ## Engine and context
 
-The **engine** is the entry point for running rules. It owns a global **context** — a registry of callables the rule can reference by name.
+The **engine** is the environment and the entry point for running rules. It owns it's global **context** — a registry of callable entries the rule can reference by name.
 
 Context entries fall into three kinds:
 
@@ -152,7 +199,7 @@ Names are normalized to **snake_case** by default (`userAge` resolves as `user_a
 
 ### Local context
 
-A **local context** is a separate `Context` instance passed when running a rule. It can override entries from the global context. When a name is not found locally, the engine falls back to the global context.
+A **local context** is an independant `Context` instance passed when running a rule. It overrides entries from the global context. When a name is not found locally, the engine falls back to the global context.
 
 ```python
 from business_rules.context import Context
@@ -206,66 +253,25 @@ Operands in conditions are strings at rest. **Data types** cast those strings to
 
 You can add your own data types and operators. See [Creating a custom data type](docs/creating-a-data-type.md) for a full walkthrough.
 
-## Builder
+## Converters
 
-`BusinessRuleBuilder` offers a fluent API to construct the same rule without nested dataclasses:
+A **converter** converts a business rule to some external representation and back. It implement `load` and `dump` methods to load business rule from some data format and dump it back.
 
-```python
-from business_rules.builder import binary, function, get_builder, variable
+Built-in converters:
 
-premium_access_rule = (
-    get_builder()
-    .having()
-    .all()
-        .all()
-            .binary(variable("age"), "gte", "18")
-            .binary(variable("status"), "eq", "active")
-            .unary(variable("email"), "is_not_null")
-        .end()
-        .any()
-            .binary(variable("tier"), "eq", "premium")
-            .negative(binary(variable("is_suspended"), "eq", "true"))
-        .end()
-        .binary(
-            variable("region"),
-            "is_in",
-            function("allowed_regions", args=("premium",)),
-        )
-    .end()
-    .on_success()
-        .action("grant_access")
-    .end()
-    .on_failure()
-        .action("reject_access")
-    .end()
-    .on_finally()
-        .action("audit_log")
-    .end()
-    .build()
-)
-```
+- **`DictConverter`** — Python `dict`
+- **`JsonConverter`** — JSON string (wraps `DictConverter`)
 
-Helper factories `variable()`, `literal()`, `function()`, `binary()`, and `unary()` are also available for building conditions outside the builder.
-
-## Translators
-
-A **translator** converts a `BusinessRule` to and from an external representation. Subclass `Translator` and implement `load` and `dump`.
-
-Built-in translators:
-
-- **`DictTranslator`** — Python `dict`
-- **`JsonTranslator`** — JSON string (wraps `DictTranslator`)
-
-Serialize a rule to a dict:
+Having the previously created rul you can serialize it to a dict or json:
 
 ```python
-from business_rules.translators import DictTranslator, JsonTranslator
+from business_rules.converters import DictConverter, JsonConverter
 
-payload = DictTranslator().dump(premium_access_rule)
-json_text = JsonTranslator().dump(premium_access_rule)
+payload = DictConverter().dump(premium_access_rule)
+json_text = JsonConverter().dump(premium_access_rule)
 ```
 
-A dumped dict has this shape (abbreviated):
+Now you have a dumped dict of such a shape (abbreviated):
 
 ```python
 {
@@ -323,19 +329,19 @@ A dumped dict has this shape (abbreviated):
 }
 ```
 
-Load a rule back from stored data:
+Load a rule back from the stored data:
 
 ```python
-rule = DictTranslator().load(payload)
-rule = JsonTranslator().load(json_text)
+rule = DictConverter().load(payload)
+rule = JsonConverter().load(json_text)
 ```
 
-To support a custom storage format, implement your own translator. See [Creating a custom translator](docs/creating-a-translator.md).
+To support a custom storage format, implement your own converter. See [Creating a custom converter](docs/creating-a-converter.md).
 
 ## Documentation
 
 - [Setup](docs/setup.md)
 - [Development](docs/development.md)
 - [Creating a custom data type](docs/creating-a-data-type.md)
-- [Creating a custom translator](docs/creating-a-translator.md)
+- [Creating a custom converter](docs/creating-a-converter.md)
 - [Name normalizers](docs/name-normalizers.md)

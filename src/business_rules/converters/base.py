@@ -1,4 +1,4 @@
-"""Translator base class for business rule persistence."""
+"""Converter base class for business rule persistence."""
 
 from __future__ import annotations
 
@@ -7,12 +7,12 @@ from typing import Generic, TypeVar
 
 from business_rules.business_rule import BusinessRule
 
-__all__ = ["Translator"]
+__all__ = ["Converter"]
 
 T = TypeVar("T")
 
 
-class Translator(ABC, Generic[T]):
+class Converter(ABC, Generic[T]):
     @abstractmethod
     def load(self, source: T) -> BusinessRule: ...
 

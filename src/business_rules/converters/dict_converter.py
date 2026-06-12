@@ -1,4 +1,4 @@
-"""Dict-based translator for business rules."""
+"""Dict-based converter for business rules."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from business_rules.condition import (
     NegatedCondition,
     UnaryCondition,
 )
+from business_rules.converters.base import Converter
 from business_rules.executable import Action
 from business_rules.operand import (
     DataTypeAwareOperand,
@@ -24,12 +25,11 @@ from business_rules.operand import (
 from business_rules.operators import builtin  # noqa: F401
 from business_rules.operators.base import BinaryOperator, UnaryOperator
 from business_rules.operators.pool import OperatorsPool
-from business_rules.translators.base import Translator
 
-__all__ = ["DictTranslator"]
+__all__ = ["DictConverter"]
 
 
-class DictTranslator(Translator[dict[str, Any]]):
+class DictConverter(Converter[dict[str, Any]]):
     def load(self, source: dict[str, Any]) -> BusinessRule:
         return BusinessRule(
             having=self._decode_condition(source["having"]),

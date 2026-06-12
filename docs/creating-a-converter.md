@@ -1,13 +1,13 @@
-# Creating a custom translator: XML
+# Creating a custom converter: XML
 
-This guide shows how to create an **XML translator** that saves a `BusinessRule` as XML and loads it back.
+This guide shows how to create an **XML converter** that saves a `BusinessRule` as XML and loads it back.
 
 You need two methods:
 
 1. **`dump`** — convert a `BusinessRule` to your format
 2. **`load`** — convert your format back to a `BusinessRule`
 
-Use a translator when you want to persist rules to a file, database, or external system. See `DictTranslator` and `JsonTranslator` for the built-in dict and JSON equivalents.
+Use a converter when you want to persist rules to a file, database, or external system. See `DictConverter` and `JsonConverter` for the built-in dict and JSON equivalents.
 
 ## Step 1 — Pick your format
 
@@ -33,9 +33,9 @@ Conventions:
 - Use the same `type` names as the built-in dict format (`all`, `any`, `binary`, `unary`, `negative`, `variable`, `literal`, `function`, `action`, …).
 - Omit empty lifecycle blocks (`on_success`, `on_failure`, `on_finally`).
 
-## Step 2 — Implement the translator
+## Step 2 — Implement the converter
 
-Subclass `Translator[str]` and implement `dump` and `load`. This example uses the standard library `xml.etree.ElementTree` module.
+Subclass `Converter[str]` and implement `dump` and `load`. This example uses the standard library `xml.etree.ElementTree` module.
 
 ```python
 from __future__ import annotations
@@ -63,10 +63,10 @@ from business_rules.operand import (
 from business_rules.operators import builtin  # noqa: F401
 from business_rules.operators.base import BinaryOperator, UnaryOperator
 from business_rules.operators.pool import OperatorsPool
-from business_rules.translators.base import Translator
+from business_rules.converters.base import Converter
 
 
-class XmlTranslator(Translator[str]):
+class XmlConverter(Converter[str]):
     def load(self, source: str) -> BusinessRule:
         root = ET.fromstring(source)
         if root.tag != "business-rule":
@@ -235,8 +235,8 @@ class XmlTranslator(Translator[str]):
 Build a rule in Python, then call `dump`. This example uses the [premium access rule](../README.md#example-premium-access) from the README:
 
 ```python
-translator = XmlTranslator()
-xml_text = translator.dump(premium_access_rule)
+converter = XmlConverter()
+xml_text = converter.dump(premium_access_rule)
 print(xml_text)
 ```
 
@@ -293,7 +293,7 @@ Output:
 Pass the XML string to `load` to get a `BusinessRule` back:
 
 ```python
-restored = translator.load(xml_text)
+restored = converter.load(xml_text)
 assert restored == premium_access_rule
 ```
 
@@ -302,10 +302,10 @@ The restored rule is ready for `engine.run(rule)`.
 ## Step 5 — Save and run
 
 ```python
-xml_text = XmlTranslator().dump(premium_access_rule)
+xml_text = XmlConverter().dump(premium_access_rule)
 # write xml_text to a file or database
 
-rule = XmlTranslator().load(xml_text)
+rule = XmlConverter().load(xml_text)
 engine.run(rule)
 ```
 
@@ -313,6 +313,6 @@ Register variables, functions, and actions on the engine before running. See [En
 
 ## Notes
 
-- Put custom translators in your own project, not in the library.
+- Put custom converters in your own project, not in the library.
 - Operator names in XML must match registered operator names (`gte`, `eq`, `is_not_null`, …).
 - Import `business_rules.operators.builtin` if you use built-in operators in loaded rules.
