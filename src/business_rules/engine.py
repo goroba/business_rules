@@ -92,6 +92,15 @@ class Engine:
             "Function",
         )
 
+    def check(
+        self,
+        business_rule: BusinessRule,
+        local_context: Context | None = None,
+    ) -> bool:
+        """Evaluate whether a business rule's condition is met."""
+        ctx = EvaluationContext(self, local_context)
+        return business_rule.evaluate(ctx)
+
     def run(
         self,
         business_rule: BusinessRule,

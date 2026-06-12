@@ -172,6 +172,49 @@ def test_global_context_get_methods_normalize_search_names(engine: Engine) -> No
     assert global_ctx.get_function("sumValues").func is sum_values
 
 
+def test_check_evaluates_condition_without_running_lifecycle(engine: Engine) -> None:
+    calls: list[str] = []
+
+    @engine.action("on_success", data_type="boolean")
+    def on_success() -> bool:
+        calls.append("success")
+        return True
+
+    @engine.action("on_failure", data_type="boolean")
+    def on_failure() -> bool:
+        calls.append("failure")
+        return False
+
+    @engine.action("on_finally", data_type="boolean")
+    def on_finally() -> bool:
+        calls.append("finally")
+        return True
+
+    rule = BusinessRule(
+        having=TrueCondition(),
+        on_success=[Action(name="on_success")],
+        on_failure=[Action(name="on_failure")],
+        on_finally=[Action(name="on_finally")],
+    )
+    assert engine.check(rule) is True
+    assert calls == []
+
+    rule = BusinessRule(
+        having=FalseCondition(),
+        on_success=[Action(name="on_success")],
+        on_failure=[Action(name="on_failure")],
+        on_finally=[Action(name="on_finally")],
+    )
+    assert engine.check(rule) is False
+    assert calls == []
+
+
+def test_check_accepts_business_rule_and_optional_context(engine: Engine) -> None:
+    rule = BusinessRule(having=TrueCondition())
+    assert engine.check(rule) is True
+    assert engine.check(rule, local_context=Context()) is True
+
+
 def test_run_accepts_business_rule_and_optional_context(engine: Engine) -> None:
     rule = BusinessRule(having=TrueCondition())
     assert engine.run(rule) is True

@@ -268,7 +268,14 @@ Names not found on the wrapped instance still fall back to the engine's global c
 
 ## Running a rule
 
-Call `engine.run(rule)` to evaluate the `having` condition and execute lifecycle actions. The method returns `True` when the condition passed, `False` otherwise.
+Call `engine.check(rule)` to evaluate only the `having` condition.
+
+```python
+passed = engine.check(premium_access_rule)
+passed = engine.check(premium_access_rule, local_context=local)
+```
+
+Call `engine.run(rule)` when you also need lifecycle actions. It evaluates the condition the same way as `check`, then runs `on_success`, `on_failure`, and `on_finally` as appropriate.
 
 **Without local context** — all names resolve against the engine's global context:
 
