@@ -211,6 +211,61 @@ def status_override() -> str:
     return "inactive"
 ```
 
+### Lazy context
+
+When your runtime data already lives on a plain object, `LazyContext` wraps that instance and exposes it as a local context without manual registration. Entries are resolved **lazily** on first use during rule evaluation.
+
+```python
+from business_rules.context import LazyContext
+
+class User:
+    age: int
+    status: str
+    email: str
+    tier: str
+    is_suspended: bool
+    region: str
+
+    def __init__(self) -> None:
+        self.age = 25
+        self.status = "active"
+        self.email = "user@example.com"
+        self.tier = "premium"
+        self.is_suspended = False
+        self.region = "US"
+
+    def allowed_regions(self, tier: str) -> tuple[str, ...]:
+        return ("US", "EU", "UK") if tier == "premium" else ("US",)
+
+    def grant_access(self) -> bool: ...
+    def reject_access(self) -> bool: ...
+    def audit_log(self) -> bool: ...
+
+user = User()
+proxy_context = LazyContext(
+    user,
+    data_types={
+        "allowed_regions": "string",
+        "is_suspended": "boolean",
+    },
+)
+
+passed = engine.run(premium_access_rule, local_context=proxy_context)
+```
+
+Mapping rules:
+
+| Instance member | Context kind |
+|---|---|
+| Non-callable attribute or property | **variable** |
+| Public method (no leading `_`) | **action** and **function** |
+
+Member names on the wrapped object are normalized under the hood using the context's name normalizer (snake_case by default), the same way names in the business rule are. You do not need to match naming conventions between the object and the rule — for example, an attribute `userAge` on the object matches `Variable("user_age")` in the rule. Pass the same `name_normalizer` as the engine when you use a custom one.
+
+`data_type` is inferred from Python type hints and return annotations for the rest. Use `data_types` only where needed — for example `allowed_regions`, whose return type is not a built-in rule data type, or to override a specific entry such as `is_suspended`.
+
+Names not found on the wrapped instance still fall back to the engine's global context, same as a regular local context.
+
 ## Running a rule
 
 Call `engine.run(rule)` to evaluate the `having` condition and execute lifecycle actions. The method returns `True` when the condition passed, `False` otherwise.
