@@ -1,4 +1,4 @@
-"""Lazy context that proxies a plain object instance."""
+"""Object context that proxies a plain object instance."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from business_rules.context.base import Context, RegisteredEntry
 from business_rules.data_types.pool import DataTypesPool
 from business_rules.name_normalizers import NameNormalizer
 
-__all__ = ["LazyContext"]
+__all__ = ["ObjectContext"]
 
 _EntryKind = Literal["variable", "action", "function"]
 
@@ -45,19 +45,19 @@ def _python_type_to_data_type(annotation: Any) -> str:
     return data_type
 
 
-class _LazyRegistry(dict[str, RegisteredEntry]):
-    def __init__(self, lazy_context: LazyContext, kind: _EntryKind) -> None:
+class _ObjectRegistry(dict[str, RegisteredEntry]):
+    def __init__(self, object_context: ObjectContext, kind: _EntryKind) -> None:
         super().__init__()
-        self._lazy_context = lazy_context
+        self._object_context = object_context
         self._kind = kind
 
     def __missing__(self, normalized_name: str) -> RegisteredEntry:
-        entry = self._lazy_context._resolve_from_target(normalized_name, self._kind)
+        entry = self._object_context._resolve_from_target(normalized_name, self._kind)
         self[normalized_name] = entry
         return entry
 
 
-class LazyContext(Context):
+class ObjectContext(Context):
     def __init__(
         self,
         target: object,
@@ -69,9 +69,9 @@ class LazyContext(Context):
         self._target = target
         self._data_types = dict(data_types or {})
         self._member_index: dict[str, tuple[str, bool]] | None = None
-        self._variables = _LazyRegistry(self, "variable")
-        self._actions = _LazyRegistry(self, "action")
-        self._functions = _LazyRegistry(self, "function")
+        self._variables = _ObjectRegistry(self, "variable")
+        self._actions = _ObjectRegistry(self, "action")
+        self._functions = _ObjectRegistry(self, "function")
 
     def _build_member_index(self) -> dict[str, tuple[str, bool]]:
         if self._member_index is not None:
@@ -118,7 +118,7 @@ class LazyContext(Context):
             if "return" not in hints:
                 raise ValueError(
                     f"No return type annotation for {original_name!r}; "
-                    "provide one or pass data_types= to LazyContext"
+                    "provide one or pass data_types= to ObjectContext"
                 )
             data_type = _python_type_to_data_type(hints["return"])
         else:
@@ -126,7 +126,7 @@ class LazyContext(Context):
             if original_name not in hints:
                 raise ValueError(
                     f"No type annotation for {original_name!r}; "
-                    "provide one or pass data_types= to LazyContext"
+                    "provide one or pass data_types= to ObjectContext"
                 )
             data_type = _python_type_to_data_type(hints[original_name])
 

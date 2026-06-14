@@ -211,12 +211,12 @@ def status_override() -> str:
     return "inactive"
 ```
 
-### Lazy context
+### Object context
 
-When your runtime data already lives on a plain object, `LazyContext` wraps that instance and exposes it as a local context without manual registration. Entries are resolved **lazily** on first use during rule evaluation.
+When your runtime data already lives on a plain object, `ObjectContext` wraps that instance and exposes it as a local context without manual registration. Entries are resolved **lazily** on first use during rule evaluation.
 
 ```python
-from business_rules.context import LazyContext
+from business_rules.context import ObjectContext
 
 class User:
     age: int
@@ -242,7 +242,7 @@ class User:
     def audit_log(self) -> bool: ...
 
 user = User()
-proxy_context = LazyContext(
+proxy_context = ObjectContext(
     user,
     data_types={
         "allowed_regions": "string",

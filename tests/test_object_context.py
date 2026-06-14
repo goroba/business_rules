@@ -1,4 +1,4 @@
-"""Tests for LazyContext."""
+"""Tests for ObjectContext."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import pytest
 
 from business_rules.business_rule import BusinessRule
 from business_rules.condition import BinaryCondition
-from business_rules.context import LazyContext
+from business_rules.context import ObjectContext
 from business_rules.engine import Engine
 from business_rules.executable import Action
 from business_rules.operand import Function, Literal, Variable
@@ -56,9 +56,9 @@ def engine() -> Engine:
     return Engine()
 
 
-def test_lazy_variable_from_attribute(engine: Engine) -> None:
+def test_object_context_variable_from_attribute(engine: Engine) -> None:
     data = Data()
-    lazy_ctx = LazyContext(data)
+    object_ctx = ObjectContext(data)
     rule = BusinessRule(
         having=BinaryCondition(
             left=Variable("var1"),
@@ -66,12 +66,12 @@ def test_lazy_variable_from_attribute(engine: Engine) -> None:
             right=Literal("active"),
         )
     )
-    assert engine.run(rule, local_context=lazy_ctx) is True
+    assert engine.run(rule, local_context=object_ctx) is True
 
 
-def test_lazy_method_as_function_and_action(engine: Engine) -> None:
+def test_object_context_method_as_function_and_action(engine: Engine) -> None:
     data = Data()
-    lazy_ctx = LazyContext(data)
+    object_ctx = ObjectContext(data)
     function_rule = BusinessRule(
         having=BinaryCondition(
             left=Function("function", args=(5,)),
@@ -79,7 +79,7 @@ def test_lazy_method_as_function_and_action(engine: Engine) -> None:
             right=Literal("10"),
         )
     )
-    assert engine.run(function_rule, local_context=lazy_ctx) is True
+    assert engine.run(function_rule, local_context=object_ctx) is True
 
     action_calls: list[bool] = []
 
@@ -96,36 +96,36 @@ def test_lazy_method_as_function_and_action(engine: Engine) -> None:
         ),
         on_success=[Action(name="action")],
     )
-    engine.run(action_rule, local_context=LazyContext(TrackingData()))
+    engine.run(action_rule, local_context=ObjectContext(TrackingData()))
     assert action_calls == [True]
 
 
-def test_lazy_registration_is_deferred(engine: Engine) -> None:
-    lazy_ctx = LazyContext(Data())
-    assert dict(lazy_ctx.variables) == {}
-    assert dict(lazy_ctx.actions) == {}
-    assert dict(lazy_ctx.functions) == {}
+def test_object_context_registration_is_deferred(engine: Engine) -> None:
+    object_ctx = ObjectContext(Data())
+    assert dict(object_ctx.variables) == {}
+    assert dict(object_ctx.actions) == {}
+    assert dict(object_ctx.functions) == {}
 
-    lazy_ctx.get_variable("var1")
-    assert "var1" in lazy_ctx.variables
-    assert dict(lazy_ctx.actions) == {}
-    assert dict(lazy_ctx.functions) == {}
+    object_ctx.get_variable("var1")
+    assert "var1" in object_ctx.variables
+    assert dict(object_ctx.actions) == {}
+    assert dict(object_ctx.functions) == {}
 
-    lazy_ctx.get_action("action")
-    assert "action" in lazy_ctx.actions
-    assert dict(lazy_ctx.functions) == {}
+    object_ctx.get_action("action")
+    assert "action" in object_ctx.actions
+    assert dict(object_ctx.functions) == {}
 
-    lazy_ctx.get_function("function")
-    assert "function" in lazy_ctx.functions
+    object_ctx.get_function("function")
+    assert "function" in object_ctx.functions
 
 
-def test_lazy_falls_back_to_global(engine: Engine) -> None:
+def test_object_context_falls_back_to_global(engine: Engine) -> None:
     @engine.variable("global_only", data_type="string")
     def global_only() -> str:
         return "global"
 
     data = Data()
-    lazy_ctx = LazyContext(data)
+    object_ctx = ObjectContext(data)
     rule = BusinessRule(
         having=BinaryCondition(
             left=Variable("global_only"),
@@ -133,17 +133,17 @@ def test_lazy_falls_back_to_global(engine: Engine) -> None:
             right=Literal("global"),
         )
     )
-    assert engine.run(rule, local_context=lazy_ctx) is True
+    assert engine.run(rule, local_context=object_ctx) is True
 
 
-def test_lazy_overrides_global(engine: Engine) -> None:
+def test_object_context_overrides_global(engine: Engine) -> None:
     @engine.variable("var1", data_type="string")
     def global_var1() -> str:
         return "global"
 
     data = Data()
     data.var1 = "local"
-    lazy_ctx = LazyContext(data)
+    object_ctx = ObjectContext(data)
     rule = BusinessRule(
         having=BinaryCondition(
             left=Variable("var1"),
@@ -151,38 +151,38 @@ def test_lazy_overrides_global(engine: Engine) -> None:
             right=Literal("local"),
         )
     )
-    assert engine.run(rule, local_context=lazy_ctx) is True
+    assert engine.run(rule, local_context=object_ctx) is True
 
 
-def test_lazy_data_type_override(engine: Engine) -> None:
+def test_object_context_data_type_override(engine: Engine) -> None:
     class AmbiguousData:
         value: int
 
         def __init__(self) -> None:
             self.value = 1
 
-    lazy_ctx = LazyContext(AmbiguousData(), data_types={"value": "string"})
-    entry = lazy_ctx.get_variable("value")
+    object_ctx = ObjectContext(AmbiguousData(), data_types={"value": "string"})
+    entry = object_ctx.get_variable("value")
     assert entry.data_type == "string"
 
 
-def test_lazy_missing_data_type_raises(engine: Engine) -> None:
-    lazy_ctx = LazyContext(DataWithoutHints())
+def test_object_context_missing_data_type_raises(engine: Engine) -> None:
+    object_ctx = ObjectContext(DataWithoutHints())
     with pytest.raises(ValueError, match="No type annotation for 'unannotated'"):
-        lazy_ctx.get_variable("unannotated")
+        object_ctx.get_variable("unannotated")
 
 
-def test_lazy_skips_private_members(engine: Engine) -> None:
-    lazy_ctx = LazyContext(DataWithPrivate())
+def test_object_context_skips_private_members(engine: Engine) -> None:
+    object_ctx = ObjectContext(DataWithPrivate())
     with pytest.raises(KeyError, match="not registered"):
-        lazy_ctx.get_variable("_hidden")
+        object_ctx.get_variable("_hidden")
     with pytest.raises(KeyError, match="not registered"):
-        lazy_ctx.get_action("_hidden_method")
+        object_ctx.get_action("_hidden_method")
 
 
-def test_lazy_name_normalization(engine: Engine) -> None:
-    lazy_ctx = LazyContext(DataWithCamelCase())
-    entry = lazy_ctx.get_variable("user_age")
+def test_object_context_name_normalization(engine: Engine) -> None:
+    object_ctx = ObjectContext(DataWithCamelCase())
+    entry = object_ctx.get_variable("user_age")
     assert entry.name == "user_age"
 
     rule = BusinessRule(
@@ -192,4 +192,4 @@ def test_lazy_name_normalization(engine: Engine) -> None:
             right=Literal("30"),
         )
     )
-    assert engine.run(rule, local_context=lazy_ctx) is True
+    assert engine.run(rule, local_context=object_ctx) is True
