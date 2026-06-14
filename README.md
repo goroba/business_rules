@@ -80,7 +80,7 @@ premium_access_rule = BusinessRule(
 )
 ```
 
-This example uses conjunction (logial `and`), disjunction (logical `or`), negation(logical `not`), unary and binary conditions, variables, literals, functions, and defines a list of actions for any outcome.
+This example uses conjunction (logical `and`), disjunction (logical `or`), negation (logical `not`), unary and binary conditions, variables, literals, functions, and defines a list of actions for any outcome.
 
 ## Business Rule Builder
 
@@ -158,7 +158,7 @@ Literals live inside the rule definition. Variables and functions are registered
 
 ## Engine and context
 
-The **engine** is the environment and the entry point for running rules. It owns it's global **context** — a registry of callable entries the rule can reference by name.
+The **engine** is the environment and the entry point for running rules. It owns its global **context** — a registry of callable entries the rule can reference by name.
 
 Context entries fall into three kinds:
 
@@ -197,9 +197,30 @@ You can also register entries programmatically via `engine.context.register_vari
 
 Names are normalized to **snake_case** by default (`userAge` resolves as `user_age`). See [Name normalizers](docs/name-normalizers.md) for built-in options and custom normalizers.
 
+### Running a rule
+
+You can **run** (execute) rule or only **check** the condition.
+
+Call `engine.check(rule)` to evaluate only the `having` condition:
+
+
+```python
+passed = engine.check(premium_access_rule)
+```
+
+Call `engine.run(rule)` when you also need lifecycle actions. It evaluates the condition the same way as `check`, then runs `on_success`, `on_failure`, and `on_finally` as appropriate.
+
+```python
+passed = engine.run(premium_access_rule)
+```
+
+On success, `on_success` actions run; on failure, `on_failure` actions run. `on_finally` actions always run last.
+
 ### Local context
 
-A **local context** is an independant `Context` instance passed when running a rule. It overrides entries from the global context. When a name is not found locally, the engine falls back to the global context.
+A **local context** is an independent `Context` instance passed when running a rule. It overrides entries from the global context. When a name is not found locally, the engine falls back to the global context.
+
+`local_context` is attached to the engine's global context only for the duration of a single `run()` or `check()` call. After execution completes, the global context no longer references it.
 
 ```python
 from business_rules.context import Context
@@ -209,87 +230,159 @@ local = Context()
 @local.variable("status", data_type="string")
 def status_override() -> str:
     return "inactive"
+
+passed = engine.check(premium_access_rule, local_context=local)
+passed = engine.run(premium_access_rule, local_context=local)
 ```
+
+### Nested contexts
+
+Contexts can be composed with `nests(inner)`, which links an inner context into an outer one. During resolution the engine walks **innermost first**, then each outer wrapper, then the global context.
+
+```python
+from business_rules.context import Context
+
+action_context = Context()
+data_context = Context()
+
+action_context.nests(data_context)
+
+engine.run(rule, local_context=action_context)
+```
+
+Fluent chaining builds deeper stacks:
+
+```python
+engine.run(
+    rule,
+    local_context=grandparent_context.nests(
+        parent_context.nests(child_context)
+    ),
+)
+```
+
+Each engine's `run()` / `check()` call scopes `local_context` onto its global context for that execution only. Nesting you configure on your own contexts (e.g. `action_context.nests(data_context)`) persists and can be reused across calls.
 
 ### Object context
 
-When your runtime data already lives on a plain object, `ObjectContext` wraps that instance and exposes it as a local context without manual registration. Entries are resolved **lazily** on first use during rule evaluation.
+When your runtime data already lives on a plain object, `ObjectContext` wraps that instance and exposes its attributes as context entries without manual registration. Objects could contain properties and methods that would be treated as variables and functions/actions in terms of context.
+
+#### Recommended: split data and action contexts
+
+The recommended approach when rules run against a domain object:
+
+- **`User`** — data attributes plus **domain helpers** on the object (e.g. `is_adult()`), exposed by `ObjectContext` as **functions**
+- **`data_context`** — `ObjectContext(user)` supplies **variables** (attributes) and **object methods** used in conditions
+- **`action_context`** — standalone **functions** (`allowed_regions`) and **lifecycle actions** (`grant_access`, etc.) that are not on the user object
+- Lifecycle actions receive the runtime user through `target()`; nest with `action_context.nests(data_context)`
+
+Domain helpers stay on the user; cross-cutting rule functions and lifecycle handlers stay on `action_context`. During `run()`, resolution walks **data (inner) → action (outer) → engine global** (see [Nested contexts](#nested-contexts) above).
 
 ```python
-from business_rules.context import ObjectContext
+from dataclasses import dataclass
 
+from business_rules.builder import binary, function, get_builder, target, variable
+from business_rules.context import Context, ObjectContext
+from business_rules.engine import Engine
+
+@dataclass
 class User:
-    age: int
-    status: str
-    email: str
-    tier: str
-    is_suspended: bool
-    region: str
+    age: int = 25
+    status: str = "active"
+    email: str = "user@example.com"
+    tier: str = "premium"
+    is_suspended: bool = False
+    region: str = "US"
 
-    def __init__(self) -> None:
-        self.age = 25
-        self.status = "active"
-        self.email = "user@example.com"
-        self.tier = "premium"
-        self.is_suspended = False
-        self.region = "US"
-
-    def allowed_regions(self, tier: str) -> tuple[str, ...]:
-        return ("US", "EU", "UK") if tier == "premium" else ("US",)
-
-    def grant_access(self) -> bool: ...
-    def reject_access(self) -> bool: ...
-    def audit_log(self) -> bool: ...
+    def is_adult(self) -> bool:
+        return self.age >= 18
 
 user = User()
-proxy_context = ObjectContext(
+
+data_context = ObjectContext(
     user,
-    data_types={
-        "allowed_regions": "string",
-        "is_suspended": "boolean",
-    },
+    data_types={"is_suspended": "boolean"},
 )
 
-passed = engine.run(premium_access_rule, local_context=proxy_context)
+action_context = Context()
+
+@action_context.function("allowed_regions", data_type="string")
+def allowed_regions(tier: str) -> tuple[str, ...]:
+    return ("US", "EU", "UK") if tier == "premium" else ("US",)
+
+@action_context.action("grant_access", data_type="boolean")
+def grant_access(user: User) -> bool:
+    print(f"access granted for {user.email}")
+    return True
+
+@action_context.action("reject_access", data_type="boolean")
+def reject_access(user: User) -> bool:
+    print(f"access rejected for {user.email}")
+    return False
+
+@action_context.action("audit_log", data_type="boolean")
+def audit_log(user: User) -> bool:
+    print(f"audit: {user.email}")
+    return True
+
+action_context.nests(data_context)
+
+premium_access_rule = (
+    get_builder()
+    .having()
+    .all()
+        .all()
+            .binary(function("is_adult"), "eq", "true")
+            .binary(variable("status"), "eq", "active")
+            .unary(variable("email"), "is_not_null")
+        .end()
+        .any()
+            .binary(variable("tier"), "eq", "premium")
+            .negative(binary(variable("is_suspended"), "eq", "true"))
+        .end()
+        .binary(
+            variable("region"),
+            "is_in",
+            function("allowed_regions", args=("premium",)),
+        )
+    .end()
+    .on_success()
+        .action("grant_access", args=(target(),))
+    .end()
+    .on_failure()
+        .action("reject_access", args=(target(),))
+    .end()
+    .on_finally()
+        .action("audit_log", args=(target(),))
+    .end()
+    .build()
+)
+
+engine = Engine()
+
+passed = engine.run(
+    premium_access_rule,
+    local_context=action_context,
+    target=user,
+)
 ```
 
-Mapping rules:
+Lifecycle actions in the rule must pass `target()` so the handler receives the user. In the example above, `function("is_adult")` resolves from the **data** context (`user.is_adult` via `ObjectContext`), while `allowed_regions` and the lifecycle handlers come from **action** context.
+
+#### `ObjectContext` mapping rules
 
 | Instance member | Context kind |
 |---|---|
 | Non-callable attribute or property | **variable** |
 | Public method (no leading `_`) | **action** and **function** |
 
+In the recommended pattern, attributes become **variables** on `data_context`; public methods on the user (e.g. `is_adult`) are available as **functions** there. Register cross-cutting rule functions and lifecycle actions on `action_context` instead of as side-effect methods on the user.
+
 Member names on the wrapped object are normalized under the hood using the context's name normalizer (snake_case by default), the same way names in the business rule are. You do not need to match naming conventions between the object and the rule — for example, an attribute `userAge` on the object matches `Variable("user_age")` in the rule. Pass the same `name_normalizer` as the engine when you use a custom one.
 
-`data_type` is inferred from Python type hints and return annotations for the rest. Use `data_types` only where needed — for example `allowed_regions`, whose return type is not a built-in rule data type, or to override a specific entry such as `is_suspended`.
+`data_type` is inferred from Python type hints on attributes. Use `data_types` only where needed — for example to override a specific entry such as `is_suspended`.
 
 Names not found on the wrapped instance still fall back to the engine's global context, same as a regular local context.
-
-## Running a rule
-
-Call `engine.check(rule)` to evaluate only the `having` condition.
-
-```python
-passed = engine.check(premium_access_rule)
-passed = engine.check(premium_access_rule, local_context=local)
-```
-
-Call `engine.run(rule)` when you also need lifecycle actions. It evaluates the condition the same way as `check`, then runs `on_success`, `on_failure`, and `on_finally` as appropriate.
-
-**Without local context** — all names resolve against the engine's global context:
-
-```python
-passed = engine.run(premium_access_rule)
-```
-
-**With local context** — local entries override global ones; missing names fall back to the global context:
-
-```python
-passed = engine.run(premium_access_rule, local_context=local)
-```
-
-On success, `on_success` actions run; on failure, `on_failure` actions run. `on_finally` actions always run last.
 
 ## Data types and operators
 
@@ -324,7 +417,7 @@ Built-in converters:
 - **`DictConverter`** — Python `dict`
 - **`JsonConverter`** — JSON string (wraps `DictConverter`)
 
-Having the previously created rul you can serialize it to a dict or json:
+Having the eligibility rule from the [recommended ObjectContext pattern](#object-context) above (with `target()` in lifecycle actions), you can serialize it to a dict or JSON:
 
 ```python
 from business_rules.converters import DictConverter, JsonConverter
@@ -345,9 +438,14 @@ Now you have a dumped dict of such a shape (abbreviated):
                 "conditions": [
                     {
                         "type": "binary",
-                        "left": {"type": "variable", "name": "age"},
-                        "operator": "gte",
-                        "right": {"type": "literal", "value": "18"},
+                        "left": {
+                            "type": "function",
+                            "name": "is_adult",
+                            "args": [],
+                            "kwargs": {},
+                        },
+                        "operator": "eq",
+                        "right": {"type": "literal", "value": "true"},
                     },
                     # ...
                 ],
@@ -355,21 +453,7 @@ Now you have a dumped dict of such a shape (abbreviated):
             {
                 "type": "any",
                 "conditions": [
-                    {
-                        "type": "binary",
-                        "left": {"type": "variable", "name": "tier"},
-                        "operator": "eq",
-                        "right": {"type": "literal", "value": "premium"},
-                    },
-                    {
-                        "type": "negative",
-                        "condition": {
-                            "type": "binary",
-                            "left": {"type": "variable", "name": "is_suspended"},
-                            "operator": "eq",
-                            "right": {"type": "literal", "value": "true"},
-                        },
-                    },
+                    # ...
                 ],
             },
             {
@@ -385,17 +469,42 @@ Now you have a dumped dict of such a shape (abbreviated):
             },
         ],
     },
-    "on_success": [{"type": "action", "name": "grant_access", "args": [], "kwargs": {}}],
-    "on_failure": [{"type": "action", "name": "reject_access", "args": [], "kwargs": {}}],
-    "on_finally": [{"type": "action", "name": "audit_log", "args": [], "kwargs": {}}],
+    "on_success": [
+        {
+            "type": "action",
+            "name": "grant_access",
+            "args": [{"type": "target"}],
+            "kwargs": {},
+        }
+    ],
+    "on_failure": [
+        {
+            "type": "action",
+            "name": "reject_access",
+            "args": [{"type": "target"}],
+            "kwargs": {},
+        }
+    ],
+    "on_finally": [
+        {
+            "type": "action",
+            "name": "audit_log",
+            "args": [{"type": "target"}],
+            "kwargs": {},
+        }
+    ],
 }
 ```
+
+`{"type": "target"}` means the action receives the runtime object passed to `engine.run(..., target=...)`. The full serialized shape is shown in [Creating a custom converter](docs/creating-a-converter.md).
 
 Load a rule back from the stored data:
 
 ```python
 rule = DictConverter().load(payload)
 rule = JsonConverter().load(json_text)
+
+engine.run(rule, local_context=action_context, target=user)
 ```
 
 To support a custom storage format, implement your own converter. See [Creating a custom converter](docs/creating-a-converter.md).

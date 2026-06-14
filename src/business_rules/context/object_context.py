@@ -52,7 +52,7 @@ class _ObjectRegistry(dict[str, RegisteredEntry]):
         self._kind = kind
 
     def __missing__(self, normalized_name: str) -> RegisteredEntry:
-        entry = self._object_context._resolve_from_target(normalized_name, self._kind)
+        entry = self._object_context._resolve_from_source(normalized_name, self._kind)
         self[normalized_name] = entry
         return entry
 
@@ -60,13 +60,13 @@ class _ObjectRegistry(dict[str, RegisteredEntry]):
 class ObjectContext(Context):
     def __init__(
         self,
-        target: object,
+        source: object,
         *,
         data_types: Mapping[str, str] | None = None,
         name_normalizer: NameNormalizer | None = None,
     ) -> None:
         super().__init__(name_normalizer=name_normalizer)
-        self._target = target
+        self._source = source
         self._data_types = dict(data_types or {})
         self._member_index: dict[str, tuple[str, bool]] | None = None
         self._variables = _ObjectRegistry(self, "variable")
@@ -78,11 +78,11 @@ class ObjectContext(Context):
             return self._member_index
 
         index: dict[str, tuple[str, bool]] = {}
-        for name in dir(self._target):
+        for name in dir(self._source):
             if name.startswith("_"):
                 continue
             try:
-                value = getattr(self._target, name)
+                value = getattr(self._source, name)
             except AttributeError:
                 continue
             normalized_name = self._normalize_entry_name(name)
@@ -109,7 +109,7 @@ class ObjectContext(Context):
         elif normalized_name in self._data_types:
             data_type = self._data_types[normalized_name]
         elif is_callable:
-            member = getattr(type(self._target), original_name, None)
+            member = getattr(type(self._source), original_name, None)
             if member is None:
                 raise ValueError(
                     f"Cannot resolve data type for callable {original_name!r}"
@@ -122,7 +122,7 @@ class ObjectContext(Context):
                 )
             data_type = _python_type_to_data_type(hints["return"])
         else:
-            hints = get_type_hints(type(self._target))
+            hints = get_type_hints(type(self._source))
             if original_name not in hints:
                 raise ValueError(
                     f"No type annotation for {original_name!r}; "
@@ -134,14 +134,14 @@ class ObjectContext(Context):
         return data_type
 
     def _make_variable_getter(self, original_name: str) -> Callable[..., Any]:
-        target = self._target
+        source = self._source
 
         def getter() -> Any:
-            return getattr(target, original_name)
+            return getattr(source, original_name)
 
         return getter
 
-    def _resolve_from_target(
+    def _resolve_from_source(
         self, normalized_name: str, kind: _EntryKind
     ) -> RegisteredEntry:
         index = self._build_member_index()
@@ -157,7 +157,7 @@ class ObjectContext(Context):
         else:
             if not is_callable:
                 raise KeyError(normalized_name)
-            func = getattr(self._target, original_name)
+            func = getattr(self._source, original_name)
 
         data_type = self._resolve_data_type(
             original_name,

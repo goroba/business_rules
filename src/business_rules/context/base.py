@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, TypeVar
+from typing import Any, Literal, Self, TypeVar
+
+_EntryKind = Literal["variable", "action", "function"]
 
 from business_rules.data_types.pool import DataTypesPool
 from business_rules.name_normalizers import NameNormalizer, SnakeCaseNameNormalizer
@@ -62,9 +64,42 @@ def _make_registration_decorator(
 class Context:
     def __init__(self, name_normalizer: NameNormalizer | None = None) -> None:
         self._name_normalizer = name_normalizer or SnakeCaseNameNormalizer()
+        self._nested: Context | None = None
         self._variables: dict[str, RegisteredEntry] = {}
         self._actions: dict[str, RegisteredEntry] = {}
         self._functions: dict[str, RegisteredEntry] = {}
+
+    def nests(self, inner: Context) -> Self:
+        self._validate_nested(inner)
+        self._nested = inner
+        return self
+
+    def _clear_nested(self) -> None:
+        self._nested = None
+
+    def _iter_nested(self) -> Iterator[Context]:
+        current: Context | None = self
+        while current is not None:
+            yield current
+            current = current._nested
+
+    def _validate_nested(self, inner: Context) -> None:
+        seen = {id(self)}
+        current: Context | None = inner
+        while current is not None:
+            if id(current) in seen:
+                raise ValueError("Circular nested context chain")
+            seen.add(id(current))
+            current = current._nested
+
+    def _lookup_entry(self, kind: _EntryKind, normalized_name: str) -> RegisteredEntry:
+        if kind == "variable":
+            registry = self._variables
+        elif kind == "action":
+            registry = self._actions
+        else:
+            registry = self._functions
+        return registry[normalized_name]
 
     def _normalize_entry_name(self, name: str) -> str:
         return self._name_normalizer.normalize(name)

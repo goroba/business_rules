@@ -16,21 +16,24 @@ Decide how your storage format represents the rule. Here is the XML shape this g
 ```xml
 <business-rule>
   <having type="all">
-    <condition type="binary" operator="gte">
-      <left type="variable" name="age"/>
-      <right type="literal" value="18"/>
+    <condition type="binary" operator="eq">
+      <left type="function" name="is_adult"/>
+      <right type="literal" value="true"/>
     </condition>
     ...
   </having>
   <on-success>
-    <action name="grant_access"/>
+    <action name="grant_access">
+      <arg type="target"/>
+    </action>
   </on-success>
 </business-rule>
 ```
 
 Conventions:
 
-- Use the same `type` names as the built-in dict format (`all`, `any`, `binary`, `unary`, `negative`, `variable`, `literal`, `function`, `action`, …).
+- Use the same `type` names as the built-in dict format (`all`, `any`, `binary`, `unary`, `negative`, `variable`, `literal`, `function`, `action`, `target`, …).
+- `target` appears only in action `args` / `kwargs` — not in condition operands.
 - Omit empty lifecycle blocks (`on_success`, `on_failure`, `on_finally`).
 
 ## Step 2 — Implement the converter
@@ -64,6 +67,7 @@ from business_rules.operators import builtin  # noqa: F401
 from business_rules.operators.base import BinaryOperator, UnaryOperator
 from business_rules.operators.pool import OperatorsPool
 from business_rules.converters.base import Converter
+from business_rules.target import Target
 
 
 class XmlConverter(Converter[str]):
@@ -134,15 +138,32 @@ class XmlConverter(Converter[str]):
             return ET.Element(tag, attrs)
         raise TypeError(f"Unsupported operand type: {type(operand).__name__}")
 
+    def _encode_action_value(self, value: object, *, tag: str) -> ET.Element:
+        if isinstance(value, Target):
+            return ET.Element(tag, type="target")
+        if isinstance(value, Operand):
+            return self._encode_operand(value, tag=tag)
+        raise TypeError(f"Unsupported action argument type: {type(value).__name__}")
+
+    def _decode_action_value(self, elem: ET.Element) -> object:
+        node_type = elem.get("type")
+        if node_type == "target":
+            return Target()
+        if node_type in {"variable", "literal", "function"}:
+            return self._decode_operand(elem)
+        raise ValueError(f"Unknown action argument type: {node_type!r}")
+
     def _encode_actions(self, actions: list[Action], tag: str) -> ET.Element:
         elem = ET.Element(tag)
         for action in actions:
-            attrs: dict[str, str] = {"name": action.name}
-            if action.args:
-                attrs["args"] = json.dumps(list(action.args))
-            if action.kwargs:
-                attrs["kwargs"] = json.dumps(action.kwargs)
-            elem.append(ET.Element("action", attrs))
+            action_elem = ET.Element("action", name=action.name)
+            for arg in action.args:
+                action_elem.append(self._encode_action_value(arg, tag="arg"))
+            for key, value in action.kwargs.items():
+                kwarg_elem = self._encode_action_value(value, tag="kwarg")
+                kwarg_elem.set("key", key)
+                action_elem.append(kwarg_elem)
+            elem.append(action_elem)
         return elem
 
     def _decode_condition(self, elem: ET.Element) -> Condition:
@@ -206,14 +227,19 @@ class XmlConverter(Converter[str]):
     def _decode_actions(self, elem: ET.Element | None) -> list[Action] | None:
         if elem is None:
             return None
-        return [
-            Action(
-                name=action.get("name", ""),
-                args=tuple(json.loads(action.get("args", "[]"))),
-                kwargs=json.loads(action.get("kwargs", "{}")),
-            )
-            for action in elem.findall("action")
-        ]
+        return [self._decode_action(action) for action in elem.findall("action")]
+
+    def _decode_action(self, elem: ET.Element) -> Action:
+        return Action(
+            name=elem.get("name", ""),
+            args=tuple(
+                self._decode_action_value(arg) for arg in elem.findall("arg")
+            ),
+            kwargs={
+                kwarg.get("key", ""): self._decode_action_value(kwarg)
+                for kwarg in elem.findall("kwarg")
+            },
+        )
 
     def _resolve_binary_operator(self, operator_name: str) -> type[BinaryOperator]:
         operator_cls = OperatorsPool.get(operator_name)
@@ -228,11 +254,11 @@ class XmlConverter(Converter[str]):
         return operator_cls
 ```
 
-`dump` walks the `BusinessRule` and builds XML elements. `load` parses the XML and reconstructs the rule.
+`dump` walks the `BusinessRule` and builds XML elements. `load` parses the XML and reconstructs the rule. Action arguments use child `<arg>` and `<kwarg>` elements so `target()` round-trips without JSON-encoding `Target` instances.
 
 ## Step 3 — Dump a rule to XML
 
-Build a rule in Python, then call `dump`. This example uses the [premium access rule](../README.md#example-premium-access) from the README:
+Build a rule in Python, then call `dump`. This example uses the [premium access rule](../README.md#object-context) from the README (with `ObjectContext`, nested contexts, and `target()` in lifecycle actions):
 
 ```python
 converter = XmlConverter()
@@ -247,9 +273,9 @@ Output:
 <business-rule>
   <having type="all">
     <condition type="all">
-      <condition type="binary" operator="gte">
-        <left type="variable" name="age"/>
-        <right type="literal" value="18"/>
+      <condition type="binary" operator="eq">
+        <left type="function" name="is_adult"/>
+        <right type="literal" value="true"/>
       </condition>
       <condition type="binary" operator="eq">
         <left type="variable" name="status"/>
@@ -277,13 +303,19 @@ Output:
     </condition>
   </having>
   <on-success>
-    <action name="grant_access"/>
+    <action name="grant_access">
+      <arg type="target"/>
+    </action>
   </on-success>
   <on-failure>
-    <action name="reject_access"/>
+    <action name="reject_access">
+      <arg type="target"/>
+    </action>
   </on-failure>
   <on-finally>
-    <action name="audit_log"/>
+    <action name="audit_log">
+      <arg type="target"/>
+    </action>
   </on-finally>
 </business-rule>
 ```
@@ -297,7 +329,7 @@ restored = converter.load(xml_text)
 assert restored == premium_access_rule
 ```
 
-The restored rule is ready for `engine.run(rule)`.
+The restored rule is ready for `engine.run(rule, local_context=action_context, target=user)`.
 
 ## Step 5 — Save and run
 
@@ -306,13 +338,14 @@ xml_text = XmlConverter().dump(premium_access_rule)
 # write xml_text to a file or database
 
 rule = XmlConverter().load(xml_text)
-engine.run(rule)
+engine.run(rule, local_context=action_context, target=user)
 ```
 
-Register variables, functions, and actions on the engine before running. See [Engine and context](../README.md#engine-and-context) in the README.
+Set up `ObjectContext`, nest it under `action_context`, and register lifecycle handlers before running. See [Object context](../README.md#object-context) in the README.
 
 ## Notes
 
+- `target` is serialized in the rule but bound only at run time via `engine.run(..., target=...)`.
 - Put custom converters in your own project, not in the library.
 - Operator names in XML must match registered operator names (`gte`, `eq`, `is_not_null`, …).
 - Import `business_rules.operators.builtin` if you use built-in operators in loaded rules.
