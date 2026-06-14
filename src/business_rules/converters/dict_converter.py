@@ -25,6 +25,7 @@ from business_rules.operand import (
 from business_rules.operators import builtin  # noqa: F401
 from business_rules.operators.base import BinaryOperator, UnaryOperator
 from business_rules.operators.pool import OperatorsPool
+from business_rules.target import Target
 
 __all__ = ["DictConverter"]
 
@@ -151,6 +152,23 @@ class DictConverter(Converter[dict[str, Any]]):
             )
         raise ValueError(f"Unknown operand type: {node_type!r}")
 
+    def _encode_action_value(self, value: Any) -> Any:
+        if isinstance(value, Target):
+            return {"type": "target"}
+        if isinstance(value, Operand):
+            return self._encode_operand(value)
+        return value
+
+    def _decode_action_value(self, value: Any) -> Any:
+        if not isinstance(value, dict) or "type" not in value:
+            return value
+        node_type = value.get("type")
+        if node_type == "target":
+            return Target()
+        if node_type in {"variable", "literal", "function"}:
+            return self._decode_operand(value)
+        raise ValueError(f"Unknown action argument type: {node_type!r}")
+
     def _encode_actions(self, actions: list[Action]) -> list[dict[str, Any]]:
         return [self._encode_action(action) for action in actions]
 
@@ -158,8 +176,13 @@ class DictConverter(Converter[dict[str, Any]]):
         return {
             "type": "action",
             "name": action.name,
-            "args": list(action.args),
-            "kwargs": action.kwargs,
+            "args": [
+                self._encode_action_value(arg) for arg in action.args
+            ],
+            "kwargs": {
+                key: self._encode_action_value(value)
+                for key, value in action.kwargs.items()
+            },
         }
 
     def _decode_actions(
@@ -176,8 +199,13 @@ class DictConverter(Converter[dict[str, Any]]):
             )
         return Action(
             name=payload["name"],
-            args=tuple(payload.get("args", [])),
-            kwargs=payload.get("kwargs", {}),
+            args=tuple(
+                self._decode_action_value(arg) for arg in payload.get("args", [])
+            ),
+            kwargs={
+                key: self._decode_action_value(value)
+                for key, value in payload.get("kwargs", {}).items()
+            },
         )
 
     def _resolve_binary_operator(self, operator_name: str) -> type[BinaryOperator]:

@@ -4,7 +4,8 @@ from business_rules.context import Context
 from business_rules.engine import Engine
 from business_rules.evaluation import EvaluationContext
 from business_rules.executable import Action
-from business_rules.operand import Literal, Variable
+from business_rules.operand import Function, Literal, Variable
+from business_rules.target import target
 
 
 @pytest.fixture
@@ -82,3 +83,58 @@ def test_action_execute_unknown_raises_key_error(engine: Engine) -> None:
 def test_action_execute_requires_context() -> None:
     with pytest.raises(TypeError):
         Action(name="noop").execute()  # type: ignore[call-arg]
+
+
+def test_action_execute_resolves_variable_and_literal(engine: Engine) -> None:
+    @engine.variable("user_id", data_type="integer")
+    def user_id() -> int:
+        return 1
+
+    @engine.action("notify", data_type="boolean")
+    def notify(user_id: int, status: str, *, channel: str) -> bool:
+        return user_id == 1 and status == "sent" and channel == "email"
+
+    action = Action(
+        name="notify",
+        args=(Variable("user_id"), Literal("sent")),
+        kwargs={"channel": Literal("email")},
+    )
+    assert action.execute(EvaluationContext(engine)) is True
+
+
+def test_action_execute_resolves_function(engine: Engine) -> None:
+    @engine.function("double", data_type="integer")
+    def double(value: int) -> int:
+        return value * 2
+
+    @engine.action("apply", data_type="integer")
+    def apply(value: int) -> int:
+        return value
+
+    action = Action(
+        name="apply",
+        args=(Function(name="double", args=(5,)),),
+    )
+    assert action.execute(EvaluationContext(engine)) == 10
+
+
+def test_action_execute_resolves_target(engine: Engine) -> None:
+    user = {"id": 7}
+
+    @engine.action("identify", data_type="integer")
+    def identify(subject: dict[str, int]) -> int:
+        return subject["id"]
+
+    action = Action(name="identify", args=(target(),))
+    ctx = EvaluationContext(engine, target=user)
+    assert action.execute(ctx) == 7
+
+
+def test_action_execute_target_without_context_target_raises(engine: Engine) -> None:
+    @engine.action("identify", data_type="integer")
+    def identify(subject: dict[str, int]) -> int:
+        return subject["id"]
+
+    action = Action(name="identify", args=(target(),))
+    with pytest.raises(ValueError, match="target\\(\\) requires target="):
+        action.execute(EvaluationContext(engine))

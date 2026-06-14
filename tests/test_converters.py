@@ -11,8 +11,10 @@ import pytest
 from business_rules.business_rule import BusinessRule
 from business_rules.condition import BinaryCondition, Condition, UnaryCondition
 from business_rules.converters import DictConverter, JsonConverter
-from business_rules.operand import Literal, Operand, Variable
+from business_rules.executable import Action
+from business_rules.operand import Function, Literal, Operand, Variable
 from business_rules.operators import EqOperator, IsNotNullOperator
+from business_rules.target import target
 from test_complex_business_rule import _build_rule
 
 _COMPLEX_ELIGIBILITY_RULE_JSON = """
@@ -288,6 +290,89 @@ def test_dict_converter_round_trip_minimal_rule() -> None:
     assert "on_success" not in converter.dump(rule)
     assert "on_failure" not in converter.dump(rule)
     assert "on_finally" not in converter.dump(rule)
+
+
+def test_dict_converter_round_trip_action_with_references() -> None:
+    converter = DictConverter()
+    rule = BusinessRule(
+        having=BinaryCondition(
+            left=Variable("status"),
+            operator=EqOperator,
+            right=Literal("active"),
+        ),
+        on_success=[
+            Action(
+                name="grant_access",
+                args=(target(), Variable("user_id"), Literal("premium")),
+                kwargs={"tier": Function(name="default_tier", args=())},
+            )
+        ],
+    )
+
+    payload = converter.dump(rule)
+    assert payload["on_success"] == [
+        {
+            "type": "action",
+            "name": "grant_access",
+            "args": [
+                {"type": "target"},
+                {"type": "variable", "name": "user_id"},
+                {"type": "literal", "value": "premium"},
+            ],
+            "kwargs": {
+                "tier": {
+                    "type": "function",
+                    "name": "default_tier",
+                    "args": [],
+                    "kwargs": {},
+                },
+            },
+        }
+    ]
+
+    restored = converter.load(payload)
+    assert restored == rule
+
+
+def test_dict_converter_round_trip_action_with_plain_args() -> None:
+    converter = DictConverter()
+    rule = BusinessRule(
+        having=BinaryCondition(
+            left=Variable("status"),
+            operator=EqOperator,
+            right=Literal("active"),
+        ),
+        on_success=[
+            Action(name="notify", args=(1, "sent"), kwargs={"channel": "email"})
+        ],
+    )
+
+    restored = converter.load(converter.dump(rule))
+    assert restored == rule
+
+
+def test_dict_converter_unknown_action_argument_type_raises() -> None:
+    converter = DictConverter()
+
+    with pytest.raises(ValueError, match="Unknown action argument type"):
+        converter.load(
+            {
+                "having": {
+                    "type": "binary",
+                    "left": {"type": "variable", "name": "status"},
+                    "operator": "eq",
+                    "right": {"type": "literal", "value": "active"},
+                },
+                "on_success": [
+                    {
+                        "type": "action",
+                        "name": "grant_access",
+                        "args": [{"type": "unknown"}],
+                        "kwargs": {},
+                    }
+                ],
+            }
+        )
 
 
 def test_dict_converter_unknown_condition_type_raises() -> None:

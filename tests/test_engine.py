@@ -12,6 +12,7 @@ from business_rules.name_normalizers import (
     CamelCaseNameNormalizer,
     SnakeCaseNameNormalizer,
 )
+from business_rules.target import target
 
 
 @pytest.fixture
@@ -286,3 +287,20 @@ def test_run_uses_local_context_for_lifecycle_actions(engine: Engine) -> None:
     )
     engine.run(rule, local_context=local_ctx)
     assert calls == ["local"]
+
+
+def test_run_passes_target_to_lifecycle_actions(engine: Engine) -> None:
+    received: list[object] = []
+
+    @engine.action("capture", data_type="boolean")
+    def capture(subject: object) -> bool:
+        received.append(subject)
+        return True
+
+    rule = BusinessRule(
+        having=TrueCondition(),
+        on_success=[Action(name="capture", args=(target(),))],
+    )
+    user = {"id": 99}
+    engine.run(rule, target=user)
+    assert received == [user]

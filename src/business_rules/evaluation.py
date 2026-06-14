@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from business_rules.context import Context
 
@@ -17,3 +17,4 @@ __all__ = ["EvaluationContext"]
 class EvaluationContext:
     engine: Engine
     local_context: Context | None = None
+    target: Any = None

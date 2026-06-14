@@ -105,9 +105,10 @@ class Engine:
         self,
         business_rule: BusinessRule,
         local_context: Context | None = None,
+        target: Any = None,
     ) -> bool:
         """Evaluate a business rule and run its lifecycle actions."""
-        ctx = EvaluationContext(self, local_context)
+        ctx = EvaluationContext(self, local_context, target=target)
         result = business_rule.evaluate(ctx)
         if result:
             for action in business_rule.on_success or []:

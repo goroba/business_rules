@@ -26,6 +26,7 @@ from business_rules.operand import (
 from business_rules.operators import builtin  # noqa: F401
 from business_rules.operators.base import BinaryOperator, UnaryOperator
 from business_rules.operators.pool import OperatorsPool
+from business_rules.target import target
 
 __all__ = [
     "BusinessRuleBuilder",
@@ -33,6 +34,7 @@ __all__ = [
     "function",
     "get_builder",
     "literal",
+    "target",
     "unary",
     "variable",
 ]
